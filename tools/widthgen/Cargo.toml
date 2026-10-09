@@ -1,0 +1,13 @@
+[package]
+name = "widthgen"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Writes src/width_sets.rs, the emoji sequence sets Measure-DisplayWidth reads, and with --powershell the table PSWriteColorEX's Private/DisplayWidthTable.ps1 holds"
+
+[dependencies]
+unicode-width = "=0.2.2"
+unicode-segmentation = "=1.13.3"
+
+# A workspace of its own, apart from the module's.
+[workspace]

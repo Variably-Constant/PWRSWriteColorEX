@@ -1,0 +1,528 @@
+# The parity corpus: each line is one case, run against PSWriteColorEX and PWRSWriteColorEX by
+# Parity.Tests.ps1, which compares what the two write. $TestDir is a folder of the case's own, and
+# Show-Value prints a value with its escape codes. Lines starting with # are skipped.
+# Basic text and console colors
+Write-ColorEX -Text 'plain'
+Write-ColorEX -Text 'a', 'b', 'c'
+Write-ColorEX -Text 'red' -Color Red
+Write-ColorEX -Text 'a', 'b' -Color Red, Green
+Write-ColorEX -Text 'a', 'b', 'c' -Color Red
+Write-ColorEX -Text 'a', 'b' -Color Yellow -BackGroundColor DarkBlue
+Write-ColorEX -Text 'a', 'b' -BackGroundColor DarkBlue
+Write-ColorEX -Text 'a', 'b' -Color $null, Green
+Write-ColorEX -Text 'a', 'b' -BackGroundColor 'None', Red
+Write-ColorEX 'positional' Green DarkRed
+Write-ColorEX -Text 'x' -Color 0
+Write-ColorEX -Text 'x' -Color 12
+Write-ColorEX -Text 'x' -BackGroundColor 0
+Write-ColorEX -Text 'x' -Color Orange
+Write-ColorEX -Text 'x' -Color LightRed -BackGroundColor DarkTeal
+Write-ColorEX -Text 'x' -Color NoSuchColor
+Write-ColorEX -Text 'x' -Color red
+Write-ColorEX -Text '  ', 'y' -Color Red, Green
+Write-ColorEX -Text 'a', '  ', 'b' -Color Red, Green, Red
+Write-ColorEX -Text 'a', ' ', 'b' -Color Red, Green, Blue -BackGroundColor DarkGray
+# Hex and RGB
+Write-ColorEX -Text 'x' -Color '#FF8000'
+Write-ColorEX -Text 'x' -Color '0xff8000'
+Write-ColorEX -Text 'x' -Color '0XFF8000'
+Write-ColorEX -Text 'x' -Color '#GGGGGG'
+Write-ColorEX -Text 'x' -Color '#FF80'
+Write-ColorEX -Text 'x' -Color @(,@(255, 128, 0))
+Write-ColorEX -Text 'x' -Color 255, 128, 0 -TrueColor
+Write-ColorEX -Text 'x' -BackGroundColor 10, 20, 30 -TrueColor
+Write-ColorEX -Text 'x' -Color @(,@(300, -5, 128)) -TrueColor
+Write-ColorEX -Text 'x' -Color @(,@(12.5, 13.5, 255.0)) -TrueColor
+Write-ColorEX -Text 'x' -Color @(,@(255, 0, 0)) -ANSI8
+Write-ColorEX -Text 'x', 'y' -Color '#FF0000', Blue
+Write-ColorEX -Text 'x', 'y' -Color 9, '#00FF00'
+Write-ColorEX -Text 'x' -BackGroundColor '#102030'
+# Modes
+Write-ColorEX -Text 'x' -Color Red -ANSI4
+Write-ColorEX -Text 'x' -Color Orange -ANSI4
+Write-ColorEX -Text 'x' -Color 91 -ANSI4
+Write-ColorEX -Text 'x' -BackGroundColor 41 -ANSI4
+Write-ColorEX -Text 'x' -Color Orange -ANSI8
+Write-ColorEX -Text 'x' -Color 208 -ANSI8
+Write-ColorEX -Text 'x' -Color 9 -ANSI8
+Write-ColorEX -Text 'x' -Color 300 -ANSI8
+Write-ColorEX -Text 'x' -Color -1 -ANSI8
+Write-ColorEX -Text 'x' -BackGroundColor 208 -ANSI8
+Write-ColorEX -Text 'x' -Color Orange -TrueColor
+Write-ColorEX -Text 'x' -Color 5 -TrueColor
+Write-ColorEX -Text 'x' -Color Red -ANSI4 -ANSI8
+Write-ColorEX -Text 'x' -Color Red -ANSI8 -TrueColor
+Write-ColorEX -Text 'x' -Color Red -ANSI4 -TrueColor -Silent
+Write-ColorEX -Text 'x' -Color 208 -ANSI8 -Silent
+# Styles
+Write-ColorEX -Text 'x' -Bold
+Write-ColorEX -Text 'x' -Color Red -Bold
+Write-ColorEX -Text 'x' -Color White -Bold
+Write-ColorEX -Text 'x' -Color DarkRed -Bold -ANSI8
+Write-ColorEX -Text 'x' -Color Orange -Bold -TrueColor
+Write-ColorEX -Text 'x' -Color '#336699' -Bold
+Write-ColorEX -Text 'x' -Color 240 -ANSI8 -Bold
+Write-ColorEX -Text 'x' -Color @(,@(10, 20, 30)) -Bold -TrueColor
+Write-ColorEX -Text 'x' -BackGroundColor DarkBlue -Bold
+Write-ColorEX -Text 'x' -Italic -Underline -Blink -Faint -CrossedOut -DoubleUnderline -Overline
+Write-ColorEX -Text 'x', 'y' -Style 'Bold'
+Write-ColorEX -Text 'x', 'y' -Style 'Bold', 'Italic'
+Write-ColorEX -Text 'x', 'y' -Style @(@('Bold', 'Underline'), 'Italic')
+Write-ColorEX -Text 'x', 'y' -Style 'bold', 'NoSuchStyle'
+Write-ColorEX -Text 'x', 'y' -Style 'Bold' -Color Red, Green -Italic
+# Gradients
+Write-ColorEX -Text 'gradient' -Gradient Red, Blue
+Write-ColorEX -Text 'gradient' -Gradient Red, Blue -TrueColor
+Write-ColorEX -Text 'gradient' -Gradient Red, Blue -ANSI8
+Write-ColorEX -Text 'gradient' -Gradient Red, Yellow, Green, Cyan
+Write-ColorEX -Text 'gra', 'dient' -Gradient '#FF0000', '#0000FF'
+Write-ColorEX -Text 'gra', 'dient' -Gradient Red, Blue -Color $null, Green
+Write-ColorEX -Text 'ab' -Gradient Red
+Write-ColorEX -Text 'ab' -Gradient Red, Green, Blue
+Write-ColorEX -Text 'abc' -Gradient @(@(255, 0, 0), @(0, 0, 255))
+Write-ColorEX -Text 'abc' -Gradient NoSuchColor, Blue
+Write-ColorEX -Text 'abc' -Gradient '#XYZ', Blue
+Write-ColorEX -Text "a$([char]::ConvertFromUtf32(0x1F600))b" -Gradient Red, Blue
+Write-ColorEX -Text 'abcdef' -Gradient '#202020', '#E0E0E0' -ANSI8
+Write-ColorEX -Text 'ab' -Gradient Red, Blue -Bold -Underline
+Write-ColorEX -Text 'ab' -Gradient Red, Blue -ANSI4
+# Layout
+Write-ColorEX -Text 'x' -StartTab 2
+Write-ColorEX -Text 'x' -StartSpaces 3
+Write-ColorEX -Text 'x' -StartTab 1 -StartSpaces 2 -Color Red
+Write-ColorEX -Text 'x' -LinesBefore 2 -LinesAfter 1
+Write-ColorEX -Text 'x' -ShowTime -DateTimeFormat "'T'"
+Write-ColorEX -Text 'x' -ShowTime -DateTimeFormat "'T'" -Color Red
+Write-ColorEX -Text 'x' -NoNewLine
+Write-ColorEX -Text 'x', 'y' -Color Red, Green -NoNewLine
+Write-ColorEX -NoNewLine
+Write-ColorEX
+Write-ColorEX -Text ''
+Write-ColorEX -Text 'x' -HorizontalCenter
+Write-ColorEX -BlankLine
+Write-ColorEX -BlankLine -BackGroundColor Blue
+Write-ColorEX -Text 'x' -NoConsoleOutput
+# Padding
+Write-ColorEX -Text 'abc' -AutoPad 6
+Write-ColorEX -Text 'abc' -AutoPad 6 -PadLeft
+Write-ColorEX -Text 'abc' -AutoPad 6 -PadChar '.'
+Write-ColorEX -Text 'a', 'b' -AutoPad 5 -Color Red, Green
+Write-ColorEX -Text "$([char]0x4E16)$([char]0x754C)" -AutoPad 6
+Write-ColorEX -Text 'abc' -AutoPad 8 -PadChar ([char]0x4E16)
+Write-ColorEX -Text 'abc' -AutoPad 6 -PadChar ([char]0x200B)
+Write-ColorEX -Text 'abcdefgh' -AutoPad 4
+# Profiles and defaults
+Write-ColorEX -Text 'x' -StyleProfile ([PSColorStyle]::Profiles['Error'])
+Write-ColorEX -Text 'x' -StyleProfile ([PSColorStyle]::Profiles['Critical'])
+Write-ColorEX -Text 'x' -StyleProfile ([PSColorStyle]::Profiles['Error']) -Color Blue
+Write-ColorEX -Text 'x' -StyleProfile (New-ColorStyle -Name 'g' -Gradient Red, Blue)
+Write-ColorEX -Text 'x' -StyleProfile (New-ColorStyle -Name 's' -ForegroundColor '#FF6B35' -StartTab 1 -LinesAfter 1)
+Write-ColorEX -Text 'x' -Default
+Set-ColorDefault -ForegroundColor Cyan -Bold; Write-ColorEX -Text 'x' -Default; Set-ColorDefault -ForegroundColor Gray
+Set-ColorDefault -Style (New-ColorStyle -Name 'Mine' -ForegroundColor Green -Italic); Write-ColorEX -Text 'x' -Default; [PSColorStyle]::InitializeDefaultProfiles()
+Set-ColorDefault
+Set-ColorDefault -ForegroundColor Cyan -Bold; Set-ColorDefault; Write-ColorEX -Text 'x' -Default; [PSColorStyle]::Default.ForegroundColor
+$s = [PSColorStyle]::new('Q', 'Red', 'Blue'); $s.Style = 'Bold'; Write-ColorEX -Text 'a', 'b' -StyleProfile $s
+$s = [PSColorStyle]::new(); $s.ToWriteColorParams()
+$s = [PSColorStyle]::new('Q'); $s.Name; $s.ForegroundColor; $s.Style.Count; $s.PadChar
+$c = [PSColorStyle]::Profiles['Error'].Clone(); $c.Name; $c.Bold; $c.ForegroundColor
+$n = New-ColorStyle -Name 'Full' -ForegroundColor Red -BackgroundColor Blue -Bold -Italic -Underline -Blink -Faint -CrossedOut -DoubleUnderline -Overline -ShowTime -NoNewLine -HorizontalCenter -StartTab 1 -StartSpaces 2 -LinesBefore 3 -LinesAfter 4 -AutoPad 5 -PadLeft -PadChar '*'; $n.ToWriteColorParams()
+New-ColorStyle 'Pos' 'Red' 'Blue' | ForEach-Object { $_.Name + ' ' + $_.ForegroundColor + ' ' + $_.BackgroundColor }
+$n = New-ColorStyle -Name 'Added' -AddToProfiles; (Get-ColorProfiles -Name 'added').Name
+@(Get-ColorProfiles -Name 'missing').Count
+(@(Get-ColorProfiles) | ForEach-Object Name | Sort-Object) -join ','
+Get-ColorProfiles Warning | ForEach-Object { $_.ForegroundColor }
+# Helpers
+Write-ColorError 'e'
+Write-ColorWarning 'w'
+Write-ColorInfo 'i'
+Write-ColorSuccess 's'
+Write-ColorCritical 'c'
+Write-ColorDebug 'd'
+Write-ColorError 'a', 'b' -NoNewLine
+Write-ColorInfo 'x' -PassThru
+Write-ColorInfo -PassThru
+'p1', 'p2' | Write-ColorSuccess -PassThru
+[PSColorStyle]::Profiles['Info'].ForegroundColor = 'Magenta'; Write-ColorInfo 'changed'; [PSColorStyle]::Profiles['Info'].ForegroundColor = 'Cyan'
+$saved = [PSColorStyle]::Profiles['Debug']; [PSColorStyle]::Profiles.Remove('Debug'); Write-ColorDebug 'fallback'; [PSColorStyle]::Profiles['Debug'] = $saved
+WCE 'alias'
+# Pipeline
+'one', 'two' | Write-ColorEX -Color Green
+'one', 'two' | Write-ColorEX -Color Red -Bold -BackGroundColor DarkGray
+'one', 'two' | Write-ColorEX -Gradient Red, Blue
+# Logging
+Write-ColorEX -Text 'log', 'line' -LogFile 'a.log' -LogPath $TestDir -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/a.log")); Remove-Item "$TestDir/a.log"
+Write-ColorEX -Text 'x' -LogFile 'b' -LogPath $TestDir -NoConsoleOutput; Test-Path "$TestDir/b.log"; Remove-Item "$TestDir/b.log"
+Write-ColorEX -Text 'é' -LogFile 'c.log' -LogPath $TestDir -Encoding unicode -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/c.log")); Remove-Item "$TestDir/c.log"
+Write-ColorEX -Text 'é' -LogFile 'd.log' -LogPath $TestDir -Encoding utf8BOM -NoConsoleOutput; Write-ColorEX -Text 'é' -LogFile 'd.log' -LogPath $TestDir -Encoding utf8BOM -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/d.log")); Remove-Item "$TestDir/d.log"
+Write-ColorEX -Text 'é' -LogFile 'e.log' -LogPath $TestDir -Encoding ascii -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/e.log")); Remove-Item "$TestDir/e.log"
+Write-ColorEX -Text 'é' -LogFile 'f.log' -LogPath $TestDir -Encoding utf32 -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/f.log")); Remove-Item "$TestDir/f.log"
+Write-ColorEX -Text 'é' -LogFile 'g.log' -LogPath $TestDir -Encoding bigendianunicode -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/g.log")); Remove-Item "$TestDir/g.log"
+Write-ColorEX -Text 'é' -LogFile 'h.log' -LogPath $TestDir -Encoding ansi -NoConsoleOutput; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/h.log")); Remove-Item "$TestDir/h.log"
+Write-ColorEX -Text 'x' -LogFile 'i.log' -LogPath $TestDir -LogLevel 'INFO' -LogTime -DateTimeFormat "'T'" -NoConsoleOutput; Get-Content "$TestDir/i.log"; Remove-Item "$TestDir/i.log"
+Write-ColorEX -Text 'x' -LogFile 'j.log' -LogPath $TestDir -NoNewLine -NoConsoleOutput; Write-ColorEX -Text 'y' -LogFile 'j.log' -LogPath $TestDir -NoConsoleOutput; Get-Content "$TestDir/j.log" -Raw; Remove-Item "$TestDir/j.log"
+Write-ColorEX -Text 'x' -LogFile "$TestDir/sub/dir/k.log" -NoConsoleOutput; Test-Path "$TestDir/sub/dir/k.log"; Remove-Item "$TestDir/sub" -Recurse
+Write-ColorEX -Text 'x' -LogFile 'l.log' -LogPath "$TestDir/new" -NoConsoleOutput; Test-Path "$TestDir/new/l.log"; Remove-Item "$TestDir/new" -Recurse
+$null = New-Item -ItemType File "$TestDir/blocker" -Force; Write-ColorEX -Text 'x' -LogFile "$TestDir/blocker/m.log" -NoConsoleOutput -LogRetry 2; Remove-Item "$TestDir/blocker"
+$null = New-Item -ItemType File "$TestDir/blocker" -Force; Write-ColorEX -Text 'x' -LogFile "$TestDir/blocker/m.log" -NoConsoleOutput -LogRetry 0; Remove-Item "$TestDir/blocker"
+Write-ColorEX -Text 'x' -LogFile "$TestDir" -NoConsoleOutput -LogRetry 1
+Write-ColorEX -Text 'x', 'y' -Color Red -BlankLine -LogFile 'n.log' -LogPath $TestDir; Get-Content "$TestDir/n.log" -Raw; Remove-Item "$TestDir/n.log"
+Write-ColorEX -Text 'ab' -AutoPad 5 -LogFile 'o.log' -LogPath $TestDir -NoConsoleOutput; Get-Content "$TestDir/o.log" -Raw; Remove-Item "$TestDir/o.log"
+Push-Location $TestDir; Write-ColorEX -Text 'x' -LogFile 'p.log' -NoConsoleOutput; Test-Path "$TestDir/p.log"; Remove-Item "$TestDir/p.log"; Pop-Location
+Write-ColorInfo 'x' -LogFile 'q.log' -NoConsoleOutput; Test-Path (Join-Path (Get-Location) 'q.log'); Remove-Item (Join-Path (Get-Location) 'q.log')
+# Conversions
+Convert-HexToRGB '#FF8000'
+Convert-HexToRGB 'ff8000'
+Convert-HexToRGB '0XFF8000'
+Convert-HexToRGB 'nope'
+$r = Convert-HexToRGB '#010203'; $r.GetType().Name; $r[0].GetType().Name
+CHR '#000000'
+Convert-RGBToANSI8 @(255, 128, 0)
+Convert-RGBToANSI8 @(128, 128, 128)
+Convert-RGBToANSI8 @(300, -20, 0)
+Convert-RGBToANSI8 @(5, 5, 5)
+Convert-RGBToANSI8 @(250, 250, 250)
+Convert-RGBToANSI8 @(100)
+Convert-RGBToANSI4 @(255, 0, 0)
+Convert-RGBToANSI4 @(128, 0, 0)
+Convert-RGBToANSI4 @(0, 200, 200)
+Convert-RGBToANSI4 @(100, 100, 100)
+Convert-RGBToANSI4 @(200, 150, 0)
+Get-LighterRGBColor @(139, 0, 0)
+Get-LighterRGBColor @(0, 0, 0) -Factor 2
+Get-LighterRGBColor @(100, 150, 200) 1.2
+Get-LighterColorName DarkRed
+Get-LighterColorName red
+Get-LighterColorName White
+Get-LighterColorName LightRed
+Get-LighterColorName darkteal
+Get-LighterANSI8Color 4
+Get-LighterANSI8Color 9
+Get-LighterANSI8Color 240
+Get-LighterANSI8Color 255
+Get-LighterANSI8Color 100 -Factor 1.6
+Get-LighterANSI8Color 300
+Lighten-ColorName DarkBlue
+LA8 1
+$t = Get-ColorTableWithRGB; $t.Count; Show-Value $t['orange']; Show-Value $t['DARKRED']
+(Get-ColorTableWithRGB).GetType().Name
+Measure-DisplayWidth 'Hello'
+Measure-DisplayWidth "$([char]0x4E16)$([char]0x754C)"
+Measure-DisplayWidth "$([char]0x2554)$([char]0x2550)" -AmbiguousAsWide
+'ab', 'abc' | Measure-DisplayWidth
+MDW ''
+# Test-AnsiSupport
+$t = Test-AnsiSupport -Silent; $t.ColorSupport; $t.SupportsBoldFonts; Show-Value $t.Details.StyleSupport; $t.Details.TerminalType; $t.Details.IsPSCore; $t.Details.OperatingSystem
+Test-AnsiSupport | Out-Null
+# Errors
+Write-ColorEX -Text 'x' -Color @{ a = 1 }
+Write-ColorEX -Text 'x' -Encoding nope
+Get-LighterColorName
+Convert-HexToRGB ''
+$d = (Test-AnsiSupport -Silent).Details; foreach ($k in ($d.Keys | Sort-Object)) { "$k " + $(if ($null -eq $d[$k]) { 'null' } else { $d[$k].GetType().Name }) + ' ' + (Show-Value $d[$k]) }
+(Test-AnsiSupport -Silent).PSObject.Properties | ForEach-Object { $_.Name + ' ' + $_.TypeNameOfValue }
+Write-ColorEX -Text 'x' -Color ([ConsoleColor]::Red)
+Write-ColorEX -Text 'x' -Color 5L
+Write-ColorEX -Text 'x' -Color @(,@('255', '0', '0')) -TrueColor
+Write-ColorEX -Text 'x' -Color $null
+Write-ColorEX -Text 'x' -BackGroundColor @()
+Write-ColorEX -Text 'x' -Color @()
+Write-ColorEX -Text 'x', 'y' -Color (New-Object System.Collections.ArrayList (, @('Red', 'Green')))
+Write-ColorEX -Text 'x' -Color ([System.Collections.Generic.List[object]]@('Red'))
+# -Debugging, with -Verbose so both modules write verbose records
+Write-ColorEX -Text 'x' -Color Red -Debugging -Verbose
+Write-ColorEX -Text 'a', 'b' -Color Red, '#00FF00' -BackGroundColor Blue -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color 255, 0, 0 -TrueColor -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color @(,@(300, 0, 0)) -TrueColor -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color 9 -ANSI8 -Bold -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color DarkRed -Bold -ANSI8 -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color White -Bold -TrueColor -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color '#336699' -BackGroundColor '#112233' -Bold -Debugging -Verbose
+Write-ColorEX -Text 'x' -BackGroundColor DarkBlue -Bold -ANSI8 -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color '#FF8000' -BackGroundColor '#0080FF' -TrueColor -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color 208 -BackGroundColor 21 -ANSI8 -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color @(,@(255, 0, 0)) -ANSI8 -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color 5 -TrueColor -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color Red -ANSI4 -ANSI8 -TrueColor -Debugging -Verbose
+Write-ColorEX -Text 'ab', 'c' -Gradient Red, Blue -Debugging -Verbose
+Write-ColorEX -Text 'ab' -Gradient Red, Blue, Green -Debugging -Verbose
+Write-ColorEX -Text 'ab' -Gradient Red -Debugging -Verbose
+Write-ColorEX -Text 'abc' -AutoPad 8 -PadChar ([char]0x4E16) -Debugging -Verbose
+Write-ColorEX -Text 'abc' -AutoPad 6 -PadLeft -Debugging -Verbose
+Write-ColorEX -Text 'abcdef' -AutoPad 3 -Debugging -Verbose
+Write-ColorEX -BlankLine -Debugging -Verbose
+Write-ColorEX -Text 'x' -StyleProfile ([PSColorStyle]::Profiles['Error']) -Default -Debugging -Verbose
+Write-ColorEX -Text 'x' -Default -Debugging -Verbose
+Write-ColorEX -Text 'x' -LogFile 'dbg.log' -LogPath $TestDir -Debugging -Verbose -NoConsoleOutput; Remove-Item "$TestDir/dbg.log"
+# Markup
+Write-ColorEX -Text '[bold red]Error:[/] file not found' -Markup
+Write-ColorEX -Text '[red on white]a[bold]b[/]c[/]d' -Markup
+Write-ColorEX -Text '[[literal]] and [/] and [nope]x[/]' -Markup
+Write-ColorEX -Text '[bold]open to the end' -Markup
+Write-ColorEX -Text '[dim]d[/][strike]s[/][invert]i[/][curly]c[/][dotted]o[/][dashed]a[/][doubleunderline]u[/][overline]v[/][blink]k[/][italic]t[/]' -Markup
+Write-ColorEX -Text '[#FF8000]hex[/] [rgb(0, 128, 255)]rgb[/] [hsl(120, 100%, 25%)]hsl[/]' -Markup
+Write-ColorEX -Text '[red on blue on green]x[/]' -Markup
+Write-ColorEX -Text '[red blue]x[/] [on]y[/] [bold on]z[/]' -Markup
+Write-ColorEX -Text '[link=https://example.com/a]site[/] after' -Markup
+Write-ColorEX -Text '[Purpel]x[/]' -Markup
+Write-ColorEX -Text '[rgb(300, 0, 0)]x[/]' -Markup
+Write-ColorEX -Text '[red]a[/]', 'b', '[blue]c[/]' -Markup -Color Green
+Write-ColorEX -Text '[red]a[/]b' -Markup -ANSI8
+Write-ColorEX -Text '[red]a[/]b' -Markup -ANSI4
+Write-ColorEX -Text '[red on blue]a[/]b' -Markup -ANSI4 -Bold
+Write-ColorEX -Text '[bold]ab[/]cd' -Markup -Gradient Red, Blue
+Write-ColorEX -Text '[red]ab[/]cd' -Markup -Gradient Red, Blue
+Write-ColorEX -Text '' -Markup
+Write-ColorEX -Text '[red][/]' -Markup -Color Blue
+Write-ColorEX -Text '[x' -Markup
+Write-ColorEX -Text 'a]]b[[c' -Markup
+Write-ColorEX -Text '[RED]upper[/] [Bold]b[/]' -Markup
+Write-ColorEX -Text '[bold red]tag[/] log' -Markup -LogFile 'mk.log' -LogPath $TestDir -NoConsoleOutput; Get-Content "$TestDir/mk.log" -Raw; Remove-Item "$TestDir/mk.log"
+Write-ColorEX -Text '[red]a[/]b' -Markup -Silent
+Write-ColorEX -Text '[nope]x' -Markup -Silent
+'[red]p1[/]', '[blue]p2[/]' | Write-ColorEX -Markup
+Write-ColorEX -Text '[bold red]a[/]' -Markup -Debugging -Verbose
+# Splitting
+Write-ColorEX -Text 'a, b, c' -Split ', ' -Color Red, Green, Blue
+Write-ColorEX -Text 'a, b, c' -SplitAround ', ' -Color Red, Gray
+Write-ColorEX -Text 'abcdefg' -SplitEvenly -Color Red, Green, Blue
+Write-ColorEX -Text 'ab' -SplitEvenly -Color Red, Green, Blue
+Write-ColorEX -Text 'abcdef' -SplitEvenly -BackGroundColor Red, Blue
+Write-ColorEX -Text 'abc' -SplitEvenly
+Write-ColorEX -Text 'a::b:c' -Split ':', '::' -Color Red, Green, Blue
+Write-ColorEX -Text 'a--b' -SplitAround '-' -Color Red, Green
+Write-ColorEX -Text 'x;y', 'z;w' -Split ';' -Color Red, Green, Blue, Yellow
+Write-ColorEX -Text 'abc' -Split '' -Color Red, Green
+Write-ColorEX -Text 'abc' -Split 'zz' -Color Red, Green
+Write-ColorEX -Text ';a;' -Split ';' -Color Red, Green, Blue
+Write-ColorEX -Text ';a;' -SplitAround ';' -Color Red, Green, Blue
+Write-ColorEX -Text '[red]a,b[/],c' -Markup -Split ',' -Color Blue, Green, Yellow
+Write-ColorEX -Text 'x' -Split ',' -SplitAround ';'
+Write-ColorEX -Text 'x' -Split ',' -SplitEvenly
+Write-ColorEX -Text 'x' -Split $null -SplitEvenly
+Write-ColorEX -Text "a$([char]::ConvertFromUtf32(0x1F600))bcd" -SplitEvenly -Color Red, Green
+Write-ColorEX -Text 'a, b' -Split ', ' -Color Red, Green -LogFile 'sp.log' -LogPath $TestDir -NoConsoleOutput; Get-Content "$TestDir/sp.log" -Raw; Remove-Item "$TestDir/sp.log"
+# Highlighting
+Write-ColorEX -Text 'error and warning here' -Highlight ([ordered]@{ 'error' = 'red bold'; 'warn\w+' = 'yellow' })
+Write-ColorEX -Text 'aaa' -Highlight ([ordered]@{ 'a+' = 'red'; 'aa' = 'blue' })
+Write-ColorEX -Text 'abc' -Highlight ([ordered]@{ 'b' = 'on blue'; 'x*' = 'red' })
+Write-ColorEX -Text 'ERROR error' -Highlight @{ 'error' = 'red' }
+Write-ColorEX -Text 'x' -Highlight @{ '(' = 'red' }
+Write-ColorEX -Text 'x' -Highlight @{ 'x' = 'nostyle' }
+Write-ColorEX -Text 'x' -Highlight @{ 'x' = $null }
+Write-ColorEX -Text 'x' -Highlight @{ 'x' = @('bold', 'red') }
+Write-ColorEX -Text 'a', 'bc', 'd' -Highlight @{ 'b.' = 'underline' } -Color Red, Green, Blue
+Write-ColorEX -Text 'ab' -Highlight @{ 'a' = '#00FF00' }
+Write-ColorEX -Text 'ab' -Highlight @{ 'a' = 'link=https://example.com/x' }
+Write-ColorEX -Text '[bold]abc[/]' -Markup -Highlight @{ 'b' = 'red' }
+Write-ColorEX -Text 'abc' -Highlight @{ 'b' = 'red' } -ANSI4
+Write-ColorEX -Text 'abc' -Highlight @{ 'b' = 'red' } -Gradient Blue, Green
+Write-ColorEX -Text '' -Highlight @{ 'x' = 'red' }
+Write-ColorEX -Text 'x' -Highlight @{}
+'h1 err', 'h2' | Write-ColorEX -Highlight @{ 'err' = 'red'; 'q' = 'zz' }
+Write-ColorEX -Text 'ab' -Highlight @{ 'b' = 'red' } -Debugging -Verbose
+# Links
+Write-ColorEX -Text 'site' -Link 'https://example.com'
+Write-ColorEX -Text 'a', 'b', 'c' -Link 'https://a.example', $null
+Write-ColorEX -Text 'a', 'b' -Link 'https://same.example' -Color Red, Green
+Write-ColorEX -Text 'x' -Link "https://bad.example/`e]8;;`a"
+Write-ColorEX -Text 'x' -Link ''
+Write-ColorEX -Text 'a', 'b' -Link 'https://seg.example' -Markup -Highlight @{ 'b' = 'link=https://hl.example' }
+# Reverse, underline style and color
+Write-ColorEX -Text 'x' -Reverse
+Write-ColorEX -Text 'x' -Invert -Color Red -BackGroundColor Blue
+Write-ColorEX -Text 'x' -UnderlineStyle Curly
+Write-ColorEX -Text 'x' -UnderlineStyle Double -Underline
+Write-ColorEX -Text 'x' -UnderlineColor Red
+Write-ColorEX -Text 'x' -UnderlineColor Red -Underline
+Write-ColorEX -Text 'x' -UnderlineColor '#FF8000' -UnderlineStyle Dotted
+Write-ColorEX -Text 'x' -UnderlineColor Red -ANSI8
+Write-ColorEX -Text 'x' -UnderlineColor Red -ANSI4
+Write-ColorEX -Text 'x' -UnderlineColor '#FF8000' -ANSI8
+Write-ColorEX -Text 'x' -UnderlineColor '#FF8000' -ANSI4
+Write-ColorEX -Text 'x' -UnderlineColor 208
+Write-ColorEX -Text 'x' -UnderlineColor 300 -ANSI8
+Write-ColorEX -Text 'x' -UnderlineColor 'None'
+Write-ColorEX -Text 'x' -UnderlineColor $null
+Write-ColorEX -Text 'x' -UnderlineColor 'Purpel'
+Write-ColorEX -Text 'x' -UnderlineColor '#GGGGGG'
+Write-ColorEX -Text 'x' -UnderlineColor 255, 128, 0 -TrueColor
+Write-ColorEX -Text 'x' -UnderlineColor @(,@(300, 0, 0))
+Write-ColorEX -Text 'a', 'b' -UnderlineColor Red, Blue -Style 'Curly'
+Write-ColorEX -Text 'a', 'b' -UnderlineColor Red -Style 'Bold', 'Dotted'
+Write-ColorEX -Text 'x' -Style 'Reverse'
+Write-ColorEX -Text 'x' -Style @(, @('Curly', 'Bold'))
+# Background gradients
+Write-ColorEX -Text 'background' -BackGroundGradient Red, Blue
+Write-ColorEX -Text 'bg' -BackGroundGradient Red, Blue -Gradient Yellow, White
+Write-ColorEX -Text 'ab', 'cd' -BackGroundGradient Red, Blue -BackGroundColor $null, Green
+Write-ColorEX -Text 'ab' -BackGroundGradient Red
+Write-ColorEX -Text 'ab' -BackGroundGradient Red, Green, Blue
+Write-ColorEX -Text 'ab' -BGGrad Red, Blue -ANSI8
+Write-ColorEX -Text 'ab' -BackGroundGradient Red, Blue -ANSI4
+Write-ColorEX -Text 'ab' -BackGroundGradient '#F00', 'hsl(240, 100%, 50%)'
+Write-ColorEX -Text 'ab' -BackGroundGradient Purpel, Blue
+Write-ColorEX -Text 'ab' -BackGroundGradient Red, Blue -Debugging -Verbose
+# Gradient spaces
+Write-ColorEX -Text 'gradient' -Gradient Red, Blue -GradientSpace RGB
+Write-ColorEX -Text 'gradient' -Gradient Red, Yellow, Blue -GradientSpace OKLab
+Write-ColorEX -Text 'gradient' -Gradient Red, Yellow, Blue -GradientSpace RGB -ANSI8
+Write-ColorEX -Text 'gradient' -Gradient Black, White -ANSI8
+Write-ColorEX -Text 'gradient' -BackGroundGradient '#123456', '#FEDCBA' -GradientSpace RGB
+Write-ColorEX -Text 'g' -Gradient Red, Blue -StyleProfile (New-ColorStyle -Name 'gs' -GradientSpace RGB)
+# Truncating, centering and wrapping
+Write-ColorEX -Text 'abcdefgh' -AutoPad 5 -Truncate
+Write-ColorEX -Text 'ab', 'cdef', 'gh' -AutoPad 5 -Truncate -Color Red, Green, Blue
+Write-ColorEX -Text 'abc' -AutoPad 5 -Truncate
+Write-ColorEX -Text 'abcdef' -AutoPad 1 -Truncate
+Write-ColorEX -Text "$([char]0x4E16)$([char]0x754C)$([char]0x4E16)" -AutoPad 4 -Truncate
+Write-ColorEX -Text 'abcdef' -Truncate
+Write-ColorEX -Text '[red]abcdef[/]gh' -Markup -AutoPad 4 -Truncate
+Write-ColorEX -Text 'ab' -AutoPad 6 -PadCenter
+Write-ColorEX -Text 'ab' -AutoPad 7 -PadCenter -PadChar '.' -Color Red, Green, Blue
+Write-ColorEX -Text 'ab' -AutoPad 6 -PadCenter -PadLeft
+Write-ColorEX -Text 'abc' -AutoPad 4 -PadCenter
+Write-ColorEX -Text 'the quick brown fox jumps' -Wrap -AutoPad 10
+Write-ColorEX -Text 'the quick brown fox jumps' -Wrap -AutoPad 10 -PadLeft -PadChar '.'
+Write-ColorEX -Text 'the quick brown fox jumps' -Wrap -AutoPad 11 -PadCenter
+Write-ColorEX -Text 'abcdefghijklmnop' -Wrap -AutoPad 5
+Write-ColorEX -Text 'the ', 'quick brown', ' fox' -Color Red, Green, Blue -Wrap -AutoPad 8
+Write-ColorEX -Text "line one`nline two`r`nthree" -Wrap -AutoPad 20
+Write-ColorEX -Text 'aaaa bbbb cccc' -Wrap -AutoPad 9 -ShowTime -DateTimeFormat "'T'" -StartTab 1
+Write-ColorEX -Text 'aaaa bbbb cccc' -Wrap -AutoPad 9 -NoNewLine
+Write-ColorEX -Text 'aaaa bbbb' -Wrap -AutoPad 4 -Gradient Red, Blue
+Write-ColorEX -Text '[red]aaaa bbbb[/] cccc' -Markup -Wrap -AutoPad 9
+Write-ColorEX -Text 'aaaa bbbb cccc' -Wrap
+Write-ColorEX -Text 'aa bb' -Wrap -AutoPad 3 -Truncate
+Write-ColorEX -Text 'aa bb cc' -Wrap -AutoPad 5 -LogFile 'wr.log' -LogPath $TestDir; Get-Content "$TestDir/wr.log" -Raw; Remove-Item "$TestDir/wr.log"
+Write-ColorEX -Text 'aa bb cc' -Wrap -AutoPad 5 -BackGroundColor DarkBlue
+Write-ColorEX -Text 'abc' -AutoPad 6 -PadCenter -Debugging -Verbose
+Write-ColorEX -Text 'aa bb' -Wrap -AutoPad 3 -Debugging -Verbose
+# Color forms and unknown names
+Write-ColorEX -Text 'x' -Color '#f80'
+Write-ColorEX -Text 'x' -Color '0XABC'
+Write-ColorEX -Text 'x' -Color 'rgb(255, 128, 0)'
+Write-ColorEX -Text 'x' -Color 'RGB( 1 2 3 )'
+Write-ColorEX -Text 'x' -Color 'rgb(300, -5, 0)'
+Write-ColorEX -Text 'x' -Color 'rgb(1,,2,3)'
+Write-ColorEX -Text 'x' -Color 'hsl(30, 100%, 50%)'
+Write-ColorEX -Text 'x' -Color 'hsl(30deg 100% 50%)'
+Write-ColorEX -Text 'x' -Color 'hsl(-120, 50, 25)'
+Write-ColorEX -Text 'x' -Color 'hsl(390, 150%, 50%)'
+Write-ColorEX -Text 'x' -Color 'hsl(30.5, 50.5%, 50.5%)'
+Write-ColorEX -Text 'x' -Color 'Purpel'
+Write-ColorEX -Text 'x', 'y' -Color 'Purpel', 'purpel'
+Write-ColorEX -Text 'x', 'y' -Color 'Purpel', Red -BackGroundColor 'Bleu'
+Write-ColorEX -Text 'x' -Color 'Purpel' -Silent
+Write-ColorEX -Text 'x' -Color 'Purpel' -ANSI8
+Write-ColorEX -Text 'x' -BackGroundColor 'none'
+Write-ColorEX -Text 'x' -Color ' '
+Write-ColorEX -Text 'x' -Color ''
+Write-ColorEX -Text 'x' -Color '#f80' -ANSI8
+Write-ColorEX -Text 'x' -Color '#f80' -ANSI4
+Write-ColorEX -Text 'a', 'b' -Color 'rgb(255, 136, 0)', 'hsl(200, 80%, 55%)' -BackGroundColor '#003366', '0x404040' -ANSI8
+Write-ColorEX -Text 'a', 'b' -Color 'rgb(255, 136, 0)', 'hsl(200, 80%, 55%)' -BackGroundColor '#003366', '0x404040' -ANSI4
+Write-ColorEX -Text '[#FF8800 on #003366]a[/] b' -Markup -Highlight @{ 'b' = '#FF8800 underline' } -ANSI8
+Write-ColorEX -Text '[#FF8800 on #003366]a[/] b' -Markup -Highlight @{ 'b' = '#FF8800 underline' } -ANSI4
+Write-ColorEX -Text 'x' -Color '#804000' -BackGroundColor '#202020' -Bold -ANSI8
+Write-ColorEX -Text 'x' -Color '#804000' -BackGroundColor '#202020' -Bold -ANSI4
+Write-ColorEX -Text 'x' -Color @(,@(255, 136, 0)) -ANSI8
+Write-ColorEX -Text 'x' -Color 'hsl(120, 100%, 25%)' -Bold
+Write-ColorEX -Text 'ab' -Gradient '#f00', 'rgb(0, 0, 255)'
+Write-ColorEX -Text 'ab' -Gradient Purpel
+Write-ColorEX -Text 'x' -Color 'rgb(1, 2, 3)' -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color 'Purpel' -Debugging -Verbose
+# Format-ColorEX
+Format-ColorEX -Text 'x' -Color Red
+Format-ColorEX 'a', 'b' Red, Green Blue
+Format-ColorEX -Text '[bold red]x[/] y' -Markup
+'p1', 'p2' | Format-ColorEX -Color Green
+Format-ColorEX
+Format-ColorEX -Text 'x'
+Format-ColorEX -Text 'the quick brown fox' -Wrap -AutoPad 10 -Color Red
+Format-ColorEX -Text 'x' -StyleProfile (New-ColorStyle -Name 'fl' -ForegroundColor Red -LinesBefore 1 -LinesAfter 1)
+(Format-ColorEX -Text 'x' -StyleProfile (New-ColorStyle -Name 'ft' -ShowTime) -Color Red) -replace '\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\]', '[time]'
+Format-ColorEX -Text 'abc' -Gradient Red, Blue -ANSI8
+Format-ColorEX -Text 'x' -Split ',' -SplitEvenly
+Format-ColorEX -Text 'x' -Highlight @{ 'x' = 'zz' }
+'f1', 'f2' | Format-ColorEX -Highlight @{ 'f' = 'nope' }
+Format-ColorEX -Text 'x' -Color @{ a = 1 }
+Format-ColorEX -Text 'x' -Color Red -Debugging -Verbose
+FCEX 'alias' -Color Blue
+(Format-ColorEX -Text 'a', 'b' -Color Red, Green).GetType().Name
+# Color names
+Register-ColorName -Name Brand -Color '#FF6B35'; Write-ColorEX -Text 'x' -Color Brand; Write-ColorEX -Text 'x' -Color brand -ANSI8; Write-ColorEX -Text 'x' -Color Brand -ANSI4; Write-ColorEX -Text 'x' -Color Brand -Silent -ANSI4 -Bold; Unregister-ColorName Brand
+Register-ColorName Sea 'rgb(0, 128, 160)'; Show-Value (Get-ColorTableWithRGB)['Sea']; Write-ColorEX -Text '[sea]x[/]' -Markup; Write-ColorEX -Text 'ab' -Gradient Sea, White; Unregister-ColorName Sea
+Register-ColorName Leaf @(10, 200, 30); Show-Value (Get-ColorTableWithRGB)['leaf']; Unregister-ColorName Leaf
+Register-ColorName Copy Orange; Show-Value (Get-ColorTableWithRGB)['Copy']; Unregister-ColorName Copy
+Register-ColorName Warm 'hsl(30, 100%, 50%)'; Show-Value (Get-ColorTableWithRGB)['Warm']; Unregister-ColorName Warm
+Register-ColorName Orange '#000000'
+Register-ColorName Orange '#000000' -Force; Write-ColorEX -Text 'x' -Color Orange; Unregister-ColorName Orange; Write-ColorEX -Text 'x' -Color Orange
+Register-ColorName '1bad' Red
+Register-ColorName 'two words' Red
+Register-ColorName None Red
+Register-ColorName on Red
+Register-ColorName Bold Red
+Register-ColorName Strike Red
+Register-ColorName Fine 'notacolor'
+Register-ColorName Fine @(1, 2)
+Register-ColorName Fine @(1, 2, 300)
+Register-ColorName Fine @(1.5, 2, 3)
+Register-ColorName Fine 'rgb(300, 0, 0)'; Unregister-ColorName Fine
+Register-ColorName Fine 5
+Unregister-ColorName NeverAdded
+Unregister-ColorName Red
+'Brand2', 'Brand3' | ForEach-Object { Register-ColorName $_ Red }; 'Brand2', 'Brand3' | Unregister-ColorName; @((Get-ColorTableWithRGB).Keys | Where-Object { $_ -like 'Brand*' }).Count
+Register-ColorName -Name Mixed -Color Red; Register-ColorName -Name MIXED -Color Blue -Force; Show-Value (Get-ColorTableWithRGB)['mixed']; Unregister-ColorName mixed
+Show-ColorTable *Blue
+Show-ColorTable 'Red', 'Dark?ed' -Background
+Show-ColorTable NoSuchName
+Register-ColorName Zz '#123456'; Show-ColorTable Zz; Unregister-ColorName Zz
+Show-ColourTable '[g]reen'
+# Profile files
+$s = New-ColorStyle -Name 'Exported' -ForegroundColor Red -BackgroundGradient Blue, Green -GradientSpace RGB -Reverse -UnderlineColor '#FF0000' -UnderlineStyle Curly -PadCenter -Truncate -Wrap -AutoPad 10 -PadChar '*' -Bold -AddToProfiles; Export-ColorProfile -Path "$TestDir/p.json" -Name Exported; Get-Content "$TestDir/p.json" -Raw; Remove-Item "$TestDir/p.json"; Remove-ColorProfile Exported
+Register-ColorName Exp '#010203'; Export-ColorProfile "$TestDir/all.json"; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/all.json")); Remove-Item "$TestDir/all.json"; Unregister-ColorName Exp
+Export-ColorProfile "$TestDir/err.json" -Name 'E*'; Get-Content "$TestDir/err.json" -Raw; Remove-Item "$TestDir/err.json"
+Export-ColorProfile "$TestDir/none.json" -Name 'Nothing*'; Get-Content "$TestDir/none.json" -Raw; Remove-Item "$TestDir/none.json"
+New-ColorStyle -Name 'Odd' -ForegroundColor @(1, 2, 3) -BackgroundColor 5 -Gradient Red, '#00FF00' | ForEach-Object { $_.Style = 'Bold', 'Italic'; $_.AddToProfiles() }; Export-ColorProfile "$TestDir/odd.json" -Name Odd; Get-Content "$TestDir/odd.json" -Raw; Remove-Item "$TestDir/odd.json"; Remove-ColorProfile Odd
+Set-Content -Path "$TestDir/in.json" -Value '{"Colors":{"Imported":"#0A0B0C"},"Default":"Fresh","Profiles":[{"Name":"Fresh","ForegroundColor":"Imported","BackgroundColor":null,"Bold":true,"AutoPad":7,"PadChar":"-","Style":["Italic"],"UnderlineColor":[1,2,3]}]}'; Import-ColorProfile "$TestDir/in.json" -PassThru | ForEach-Object { $_.Name; $_.ForegroundColor; $_.Bold; $_.AutoPad; $_.PadChar; Show-Value $_.Style; Show-Value $_.UnderlineColor }; [PSColorStyle]::Default.Name; Write-ColorEX -Text 'x' -Default; Show-Value (Get-ColorTableWithRGB)['Imported']; Remove-Item "$TestDir/in.json"; Remove-ColorProfile Fresh; Unregister-ColorName Imported; [PSColorStyle]::InitializeDefaultProfiles()
+Push-Location $TestDir; Set-Content -Path 'bad.json' -Value '{ not json'; try { Import-ColorProfile 'bad.json' } finally { Remove-Item 'bad.json'; Pop-Location }
+Push-Location $TestDir; try { Import-ColorProfile 'missing.json' } finally { Pop-Location }
+Set-Content -Path "$TestDir/empty.json" -Value '{"Profiles":[{"Name":""},null,{"Name":"Solo"}]}'; Import-ColorProfile "$TestDir/empty.json"; (Get-ColorProfiles -Name Solo).ForegroundColor; Remove-Item "$TestDir/empty.json"; Remove-ColorProfile Solo
+Set-Content -Path "$TestDir/badcolor.json" -Value '{"Colors":{"1bad":"#000000","Good":"#101010"}}'; Import-ColorProfile "$TestDir/badcolor.json"; Show-Value (Get-ColorTableWithRGB)['Good']; Remove-Item "$TestDir/badcolor.json"; Unregister-ColorName Good
+Remove-ColorProfile NoSuchProfile
+New-ColorStyle -Name 'Temp' -AddToProfiles | Out-Null; Remove-ColorProfile Temp -WhatIf; (Get-ColorProfiles -Name Temp).Name; Remove-ColorProfile Temp; @(Get-ColorProfiles -Name Temp).Count
+'T1', 'T2' | ForEach-Object { New-ColorStyle -Name $_ -AddToProfiles | Out-Null }; 'T1', 'T2', 'T3' | Remove-ColorProfile; (@(Get-ColorProfiles) | ForEach-Object Name | Sort-Object) -join ','
+# New style properties
+$n = New-ColorStyle -Name 'New' -BackgroundGradient Red, Blue -GradientSpace RGB -Reverse -UnderlineColor Red -UnderlineStyle Dashed -PadCenter -Truncate -Wrap; Show-Value $n.ToWriteColorParams()
+$n = New-ColorStyle 'Pos2' Red Blue $null 1 2 3 4 5 '_' @('Red', 'Blue') RGB Green Curly; Show-Value $n.ToWriteColorParams()
+$n = [PSColorStyle]::new('Blank'); $n.GradientSpace; $n.UnderlineStyle; $null -eq $n.UnderlineColor; $null -eq $n.BackgroundGradient; $n.Reverse; $n.Wrap
+$n = New-ColorStyle -Name 'Cl' -BackgroundGradient Red, Blue -UnderlineColor @(1, 2, 3) -Wrap; $c = $n.Clone(); $c.UnderlineColor[0] = 9; $n.UnderlineColor[0]; $c.Wrap; Show-Value $c.BackgroundGradient
+Write-ColorEX -Text 'abcdef' -StyleProfile (New-ColorStyle -Name 'u' -UnderlineColor Red -UnderlineStyle Curly -Reverse)
+Write-ColorEX -Text 'abcdef' -StyleProfile (New-ColorStyle -Name 'w' -Wrap -AutoPad 3 -PadCenter)
+Write-ColorEX -Text 'abcdef' -StyleProfile (New-ColorStyle -Name 't' -Truncate -AutoPad 3)
+Write-ColorEX -Text 'ab' -StyleProfile (New-ColorStyle -Name 'b' -BackgroundGradient Red, Blue -BackgroundColor Green)
+Write-ColorEX -Text 'ab' -StyleProfile (New-ColorStyle -Name 'u2' -UnderlineColor Red) -UnderlineColor Blue
+# Color variables
+$env:CLICOLOR = '0'; Write-ColorEX -Text 'x' -Color Red -Bold; $env:CLICOLOR = $null
+$env:CLICOLOR = '0'; Format-ColorEX -Text 'x' -Color Red; $env:CLICOLOR = $null
+$env:CLICOLOR = '1'; Write-ColorEX -Text 'x' -Color Red; $env:CLICOLOR = $null
+$env:CLICOLOR_FORCE = '1'; $env:CLICOLOR = '0'; Write-ColorEX -Text 'x' -Color Red -Bold -Debugging -Verbose; $env:CLICOLOR_FORCE = $null; $env:CLICOLOR = $null
+$env:CLICOLOR_FORCE = '0'; $env:CLICOLOR = '0'; Write-ColorEX -Text 'x' -Color Red -Bold; $env:CLICOLOR_FORCE = $null; $env:CLICOLOR = $null
+$env:CLICOLOR_FORCE = '1'; $old = $env:TERM; $env:TERM = 'dumb'; Write-ColorEX -Text 'x' -Color Red -Bold; $env:TERM = $old; $env:CLICOLOR_FORCE = $null
+$old = $env:TERM; $env:TERM = 'DUMB'; Write-ColorEX -Text 'x' -Color Red -Bold; $env:TERM = $old
+$env:CLICOLOR = '0'; Write-ColorEX -Text 'x' -Color Red -Debugging -Verbose; $env:CLICOLOR = $null
+$env:CLICOLOR = '0'; (Test-AnsiSupport -Silent).ColorSupport; $env:CLICOLOR = $null
+# Tab completion
+(TabExpansion2 -inputScript 'Write-ColorEX -Color DarkB' -cursorColumn 26).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
+(TabExpansion2 -inputScript 'Write-ColorEX -BackGroundColor ''lightg' -cursorColumn 37).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Format-ColorEX -UnderlineColor Ora' -cursorColumn 34).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'New-ColorStyle -Name x -BackgroundGradient Re' -cursorColumn 45).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Set-ColorDefault -ForegroundColor Cy' -cursorColumn 36).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Show-ColorTable Tea' -cursorColumn 19).CompletionMatches.CompletionText -join ','
+Register-ColorName Zeta '#123456'; Register-ColorName Alpha Red; (TabExpansion2 -inputScript 'Unregister-ColorName ' -cursorColumn 21).CompletionMatches.CompletionText -join ','; Unregister-ColorName Zeta, Alpha
+(TabExpansion2 -inputScript 'Register-ColorName x -Color Gol' -cursorColumn 31).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Get-ColorProfiles ' -cursorColumn 18).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Remove-ColorProfile e' -cursorColumn 21).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Export-ColorProfile x -Name D' -cursorColumn 29).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Write-ColorEX -Gradient Red, Gre' -cursorColumn 32).CompletionMatches.CompletionText -join ','

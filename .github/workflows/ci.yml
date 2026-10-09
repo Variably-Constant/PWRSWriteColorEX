@@ -1,0 +1,372 @@
+# Builds the module's native library for each of its seven platforms, runs the Pester suites
+# where the runner can load the library, and joins the platforms' module folders into one with
+# `cargo pwrs merge`.
+#
+# Each library is linked for the platform it runs on: win-x64 and win-arm64 on Windows,
+# linux-x64 and linux-arm64 by cargo-zigbuild against glibc 2.35, so they load on any
+# distribution with glibc 2.35 or later, osx-arm64 and osx-x64 on macOS, and freebsd-x64 in a
+# FreeBSD VM. The suites run in pwsh on Windows x64, Linux x64, macOS arm64 and FreeBSD x64, and
+# in Windows PowerShell 5.1 on Windows x64. The parity suite compares each with PSWriteColorEX at
+# the commit PSWRITECOLOREX_REF names.
+#
+# It runs on every branch but main, which only takes fast-forwards to commits a branch run
+# tested, and on dispatch.
+
+name: ci
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_PWRS_VERSION: '0.5.0'
+  PESTER_VERSION: '6.2.0'
+  # PSWriteColorEX 1.2.0, the module this one matches
+  PSWRITECOLOREX_REF: f940803618c92ec3cf5293661becfcd332a3d23c
+
+jobs:
+  windows:
+    name: Windows x64 (pwsh and Windows PowerShell 5.1), Windows arm64
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MarkusMcNugen/PSWriteColorEX
+          ref: ${{ env.PSWRITECOLOREX_REF }}
+          path: psmodule
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache the PWRS toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.pwrs
+          key: pwrs-toolchain-${{ runner.os }}-${{ env.CARGO_PWRS_VERSION }}
+
+      - name: Install cargo-pwrs
+        shell: pwsh
+        run: |
+          if (-not (Get-Command cargo-pwrs -ErrorAction SilentlyContinue)) {
+              cargo install cargo-pwrs --version $env:CARGO_PWRS_VERSION --locked
+              if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-pwrs failed' }
+          }
+
+      # cargo pwrs test imports the Pester PWRS_PESTER_PATH names, in pwsh and in Windows
+      # PowerShell alike
+      - name: Pester ${{ env.PESTER_VERSION }}
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'pester'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Save-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Path $dir -Force
+          Add-Content -Path $env:GITHUB_ENV -Value "PWRS_PESTER_PATH=$(Join-Path $dir "Pester/$env:PESTER_VERSION/Pester.psd1")"
+
+      - name: The hosts this job runs on
+        shell: pwsh
+        run: |
+          "pwsh $($PSVersionTable.PSVersion) on $([System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)"
+          powershell -NoProfile -Command '"Windows PowerShell " + $PSVersionTable.PSVersion'
+          rustc --version
+
+      - name: Build win-x64 and run the suites in pwsh and Windows PowerShell 5.1
+        shell: pwsh
+        env:
+          PSWRITECOLOREX: ${{ github.workspace }}/psmodule/PSWriteColorEX.psd1
+        run: |
+          cargo pwrs test --release
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs test failed' }
+          New-Item -ItemType Directory -Force staging/win-x64 | Out-Null
+          Copy-Item -Recurse target/pwrs/PWRSWriteColorEX staging/win-x64/
+
+      - name: Build win-arm64
+        shell: pwsh
+        run: |
+          cargo pwrs build --release --target aarch64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs build failed' }
+          New-Item -ItemType Directory -Force staging/win-arm64 | Out-Null
+          Copy-Item -Recurse target/pwrs/PWRSWriteColorEX staging/win-arm64/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-windows
+          path: staging
+
+  linux:
+    name: Linux x64, Linux arm64 (glibc 2.35)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MarkusMcNugen/PSWriteColorEX
+          ref: ${{ env.PSWRITECOLOREX_REF }}
+          path: psmodule
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache the PWRS toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.pwrs
+          key: pwrs-toolchain-${{ runner.os }}-${{ env.CARGO_PWRS_VERSION }}
+
+      # cargo pwrs builds a triple with a glibc version through cargo-zigbuild, which links
+      # against that glibc's symbols with zig
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Install cargo-pwrs and cargo-zigbuild
+        shell: pwsh
+        run: |
+          if (-not (Get-Command cargo-pwrs -ErrorAction SilentlyContinue)) {
+              cargo install cargo-pwrs --version $env:CARGO_PWRS_VERSION --locked
+              if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-pwrs failed' }
+          }
+          if (-not (Get-Command cargo-zigbuild -ErrorAction SilentlyContinue)) {
+              cargo install cargo-zigbuild --locked
+              if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-zigbuild failed' }
+          }
+
+      - name: Pester ${{ env.PESTER_VERSION }}
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'pester'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Save-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Path $dir -Force
+          Add-Content -Path $env:GITHUB_ENV -Value "PWRS_PESTER_PATH=$(Join-Path $dir "Pester/$env:PESTER_VERSION/Pester.psd1")"
+
+      - name: Build linux-x64 for glibc 2.35 and run the suites
+        shell: pwsh
+        env:
+          PSWRITECOLOREX: ${{ github.workspace }}/psmodule/PSWriteColorEX.psd1
+        run: |
+          "pwsh $($PSVersionTable.PSVersion) on $([System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)"
+          cargo pwrs test --release --target x86_64-unknown-linux-gnu.2.35
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs test failed' }
+          New-Item -ItemType Directory -Force staging/linux-x64 | Out-Null
+          Copy-Item -Recurse target/pwrs/PWRSWriteColorEX staging/linux-x64/
+
+      - name: Build linux-arm64 for glibc 2.35
+        shell: pwsh
+        run: |
+          cargo pwrs build --release --target aarch64-unknown-linux-gnu.2.35
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs build failed' }
+          New-Item -ItemType Directory -Force staging/linux-arm64 | Out-Null
+          Copy-Item -Recurse target/pwrs/PWRSWriteColorEX staging/linux-arm64/
+
+      # Each library may need no glibc symbol newer than 2.35
+      - name: Check the glibc versions the libraries need
+        shell: bash
+        run: |
+          for lib in staging/linux-*/PWRSWriteColorEX/runtimes/*/native/*.so; do
+            newest=$(objdump -T "$lib" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -1)
+            echo "$lib needs glibc $newest"
+            if [ "$(printf '%s\n2.35\n' "$newest" | sort -V | tail -1)" != "2.35" ]; then
+              echo "$lib needs a glibc newer than 2.35"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-linux
+          path: staging
+
+  macos:
+    name: macOS arm64, macOS x64
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MarkusMcNugen/PSWriteColorEX
+          ref: ${{ env.PSWRITECOLOREX_REF }}
+          path: psmodule
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache the PWRS toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.pwrs
+          key: pwrs-toolchain-${{ runner.os }}-${{ env.CARGO_PWRS_VERSION }}
+
+      - name: Install cargo-pwrs
+        shell: pwsh
+        run: |
+          if (-not (Get-Command cargo-pwrs -ErrorAction SilentlyContinue)) {
+              cargo install cargo-pwrs --version $env:CARGO_PWRS_VERSION --locked
+              if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-pwrs failed' }
+          }
+
+      - name: Pester ${{ env.PESTER_VERSION }}
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'pester'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Save-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Path $dir -Force
+          Add-Content -Path $env:GITHUB_ENV -Value "PWRS_PESTER_PATH=$(Join-Path $dir "Pester/$env:PESTER_VERSION/Pester.psd1")"
+
+      # .cargo/config.toml builds for the apple-a14 core, the oldest Apple Silicon, so the
+      # library runs on every Mac that has one
+      - name: Build osx-arm64 and run the suites
+        shell: pwsh
+        env:
+          PSWRITECOLOREX: ${{ github.workspace }}/psmodule/PSWriteColorEX.psd1
+        run: |
+          "pwsh $($PSVersionTable.PSVersion) on $([System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)"
+          cargo pwrs test --release
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs test failed' }
+          New-Item -ItemType Directory -Force staging/osx-arm64 | Out-Null
+          Copy-Item -Recurse target/pwrs/PWRSWriteColorEX staging/osx-arm64/
+
+      - name: Build osx-x64
+        shell: pwsh
+        run: |
+          cargo pwrs build --release --target x86_64-apple-darwin
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs build failed' }
+          New-Item -ItemType Directory -Force staging/osx-x64 | Out-Null
+          Copy-Item -Recurse target/pwrs/PWRSWriteColorEX staging/osx-x64/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-macos
+          path: staging
+
+  freebsd:
+    name: FreeBSD x64
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MarkusMcNugen/PSWriteColorEX
+          ref: ${{ env.PSWRITECOLOREX_REF }}
+          path: psmodule
+
+      # FreeBSD's packaged .NET is .NET 9, which runs the PWRS toolset 5.3.0 rather than the
+      # pinned one built for .NET 10; what the shell compiles against is the same on every
+      # machine. Its pwsh saves modules with PSResourceGet, which asks before trusting the
+      # gallery unless told to, and comes without Microsoft.PowerShell.Archive, whose
+      # Expand-Archive the toolset download uses. Pester asks IsWindows, IsLinux and IsMacOS,
+      # all false on FreeBSD, and stops, so the Pester imported first sets IsLinux for the
+      # session.
+      - name: Build freebsd-x64 and run the suites in a FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '15.0'
+          usesh: true
+          copyback: true
+          envs: 'CARGO_PWRS_VERSION PESTER_VERSION'
+          prepare: |
+            pkg install -y curl git powershell
+          run: |
+            set -e
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            . "$HOME/.cargo/env"
+            rustc --version
+            pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion + " on " + [System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription'
+            cargo install cargo-pwrs --version "$CARGO_PWRS_VERSION" --locked
+            pester="$PWD/pester"
+            mkdir -p "$pester"
+            pwsh -NoProfile -Command "Save-PSResource -Name Pester -Version $PESTER_VERSION -Path '$pester' -TrustRepository"
+            pwsh -NoProfile -Command "Install-PSResource -Name Microsoft.PowerShell.Archive -TrustRepository -Quiet"
+            printf '%s\n' "Set-Variable -Name IsLinux -Value \$true -Scope Global -Force" "Import-Module (Join-Path \$PSScriptRoot 'Pester/$PESTER_VERSION/Pester.psd1') -Global -ErrorAction Stop" > "$pester/PesterIsLinuxShim.psm1"
+            export PWRS_PESTER_PATH="$pester/PesterIsLinuxShim.psm1"
+            export PWRS_TOOLSET=5.3.0
+            export PSWRITECOLOREX="$PWD/psmodule/PSWriteColorEX.psd1"
+            cargo pwrs test --release
+            mkdir -p staging/freebsd-x64
+            cp -R target/pwrs/PWRSWriteColorEX staging/freebsd-x64/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-freebsd
+          path: staging
+
+  module:
+    name: Module for all platforms
+    needs: [windows, linux, macos, freebsd]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo-pwrs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-pwrs
+          key: cargo-pwrs-${{ runner.os }}-${{ env.CARGO_PWRS_VERSION }}
+
+      - name: Install cargo-pwrs
+        shell: pwsh
+        run: |
+          if (-not (Get-Command cargo-pwrs -ErrorAction SilentlyContinue)) {
+              cargo install cargo-pwrs --version $env:CARGO_PWRS_VERSION --locked
+              if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-pwrs failed' }
+          }
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-*
+          path: staging
+          merge-multiple: true
+
+      # cargo pwrs merge copies each platform's runtimes/<rid> into one folder, and refuses
+      # folders whose manifests differ
+      - name: Join the platforms' module folders
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item -Recurse staging/linux-x64/PWRSWriteColorEX out/
+          $others = 'win-x64', 'win-arm64', 'linux-arm64', 'osx-arm64', 'osx-x64', 'freebsd-x64' | ForEach-Object { "staging/$_/PWRSWriteColorEX" }
+          cargo pwrs merge out/PWRSWriteColorEX @others
+          if ($LASTEXITCODE -ne 0) { throw 'cargo pwrs merge failed' }
+          $rids = @(Get-ChildItem out/PWRSWriteColorEX/runtimes -Directory | ForEach-Object Name | Sort-Object)
+          "runtimes: $($rids -join ', ')"
+          if ($rids.Count -ne 7) { throw "The module carries $($rids.Count) platforms, not 7" }
+
+      - name: Import the joined module
+        shell: pwsh
+        run: |
+          Import-Module ./out/PWRSWriteColorEX/PWRSWriteColorEX.psd1 -ErrorAction Stop
+          $commands = @(Get-Command -Module PWRSWriteColorEX -CommandType Cmdlet)
+          "$($commands.Count) cmdlets"
+          if ($commands.Count -ne 26) { throw "The module exports $($commands.Count) cmdlets, not 26" }
+          Write-ColorEX -Text 'PWRSWriteColorEX ', 'imports' -Color Cyan, Green
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PWRSWriteColorEX
+          path: out

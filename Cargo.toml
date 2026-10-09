@@ -1,0 +1,66 @@
+[package]
+name = "pwrs-write-color-ex"
+version = "1.2.0"
+authors = ["Mark Newton"]
+edition = "2024"
+rust-version = "1.98"
+description = """Colored and styled console output for PowerShell: TrueColor, ANSI 256 and 16 colors, \
+gradients, markup, highlighting, links, text styles, style profiles, padding and wrapping that count wide \
+characters, and logging to a file. \
+The commands, parameters, aliases and output of PSWriteColorEX \
+(https://github.com/MarkusMcNugen/PSWriteColorEX), so a script written for it runs unchanged. \
+Bound directly to Rust with PoWerRuSt (pwrs), Rust bindings for writing PowerShell binary modules in the \
+spirit of PyO3: the cmdlets are the library, not a wrapper over a command line. Windows x64 and arm64, \
+Linux x64 and arm64 (glibc 2.35 and newer), macOS arm64 and x64, and FreeBSD x64 in one module, on \
+PowerShell 7.4 or later and, on Windows, Windows PowerShell 5.1. Source and issues at \
+https://github.com/Variably-Constant/PWRSWriteColorEX; the binding framework at \
+https://github.com/Variably-Constant/PWRS and https://crates.io/crates/PoWerRuSt."""
+license = "MIT"
+repository = "https://github.com/Variably-Constant/PWRSWriteColorEX"
+keywords = ["powershell", "color", "ansi", "truecolor", "console", "cmdlet"]
+# Ships as a PowerShell module, not to crates.io.
+publish = false
+
+# The module manifest's CompanyName, Copyright, LicenseUri and ReleaseNotes;
+# Author is `authors` and ProjectUri is `repository`.
+[package.metadata.pwrs]
+company = "Variably Constant"
+copyright = "(c) 2026 Mark Newton"
+license-uri = "https://github.com/Variably-Constant/PWRSWriteColorEX/blob/main/LICENSE"
+release-notes = """The first release of PWRSWriteColorEX: the commands of PSWriteColorEX 1.2.0 written \
+in Rust with PWRS, with the same names, parameters, aliases, PSColorStyle class and output, markup tags, \
+-Split, -Highlight, -Link, OKLab gradients, -Wrap and -Truncate among them, for Windows x64 and arm64, \
+Linux x64 and arm64, macOS arm64 and x64, and FreeBSD x64. It imports in PowerShell 7.4 or later and \
+Windows PowerShell 5.1, and its version follows PSWriteColorEX's. The full list is in CHANGELOG.md: \
+https://github.com/Variably-Constant/PWRSWriteColorEX/blob/main/CHANGELOG.md"""
+
+# The module's native library.
+[lib]
+name = "pwrs_write_color_ex"
+crate-type = ["cdylib"]
+
+[dependencies]
+# The binding framework, published on crates.io as PoWerRuSt, since crates.io
+# carries an unrelated `pwrs`; the library it builds is still `pwrs`, which is
+# what the source writes. cargo-pwrs builds the module and takes the same
+# version.
+pwrs = { package = "PoWerRuSt", version = "0.5.0" }
+# Display width of each code point, the table PSWriteColorEX's Measure-DisplayWidth
+# is generated from, so both modules measure text alike.
+unicode-width = "=0.2.2"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = "warn"
+
+# A workspace of its own, so tools/ builds apart.
+[workspace]
+
+# The module ships from the release profile. Unwinding stays on: PWRS turns a
+# panic at the boundary into a terminating error, where abort would end the
+# PowerShell process.
+[profile.release]
+lto = "fat"
+codegen-units = 1
