@@ -2,7 +2,7 @@
 //! environment and the host by the same rules as PSWriteColorEX. Write-ColorEX detects once per
 //! session and keeps the result.
 
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use pwrs::prelude::*;
 
@@ -25,6 +25,12 @@ impl Support {
             Support::Ansi8 => "ANSI8",
             Support::TrueColor => "TrueColor",
         }
+    }
+
+    /// The color mode with this name as Test-AnsiSupport reports it, compared without regard to
+    /// case.
+    pub fn from_name(name: &str) -> Option<Support> {
+        SUPPORTS.into_iter().find(|s| s.as_str().eq_ignore_ascii_case(name))
     }
 }
 
@@ -54,10 +60,12 @@ impl Styles {
     }
 }
 
-/// What Test-AnsiSupport answers.
+/// What Test-AnsiSupport returns.
 pub struct Detection {
     pub color_support: Support,
     pub bold_fonts: bool,
+    /// Whether the terminal can show Unicode; see unicode_support.
+    pub unicode: bool,
     pub ps_version: String,
     pub is_console_host: bool,
     pub virtual_terminal: bool,
@@ -83,7 +91,7 @@ fn windows_version() -> (i64, i64) {
 }
 
 /// Switches on virtual terminal processing for the console the process writes to, when it is
-/// off, and answers whether it is on: Some(true) when this call switched it on.
+/// off, and returns whether it is on: Some(true) when this call switched it on.
 #[cfg(windows)]
 fn console_virtual_terminal() -> Option<(bool, bool)> {
     type Handle = *mut std::ffi::c_void;
@@ -151,6 +159,90 @@ fn console_host_window() -> bool {
     false
 }
 
+/// Whether the console's screen buffer draws with a raster font. The console's own buffer,
+/// CONOUT$, is asked, so redirected standard output does not change the answer; false where there
+/// is no console or its font cannot be read.
+#[cfg(windows)]
+fn raster_font() -> bool {
+    type Handle = *mut std::ffi::c_void;
+    #[repr(C)]
+    struct ConsoleFontInfoEx {
+        size: u32,
+        font: u32,
+        width: i16,
+        height: i16,
+        family: u32,
+        weight: u32,
+        face: [u16; 32],
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn CreateFileW(name: *const u16, access: u32, share: u32, security: Handle, disposition: u32, flags: u32, template: Handle) -> Handle;
+        fn GetCurrentConsoleFontEx(console: Handle, maximum_window: i32, info: *mut ConsoleFontInfoEx) -> i32;
+        fn CloseHandle(handle: Handle) -> i32;
+    }
+    const GENERIC_READ_WRITE: u32 = 0xC000_0000;
+    const FILE_SHARE_READ_WRITE: u32 = 3;
+    const OPEN_EXISTING: u32 = 3;
+    // Clear in a raster font's family
+    const TMPF_TRUETYPE: u32 = 4;
+    let name: Vec<u16> = "CONOUT$".encode_utf16().chain(std::iter::once(0)).collect();
+    let mut info = ConsoleFontInfoEx { size: std::mem::size_of::<ConsoleFontInfoEx>() as u32, font: 0, width: 0, height: 0, family: 0, weight: 0, face: [0; 32] };
+    // SAFETY: the name is a terminated UTF-16 string, the info's size field holds its own size, and
+    // the handle CreateFileW returns is closed once its font is read.
+    unsafe {
+        let handle = CreateFileW(name.as_ptr(), GENERIC_READ_WRITE, FILE_SHARE_READ_WRITE, std::ptr::null_mut(), OPEN_EXISTING, 0, std::ptr::null_mut());
+        if handle as isize == -1 {
+            return false;
+        }
+        let read = GetCurrentConsoleFontEx(handle, 0, &mut info);
+        CloseHandle(handle);
+        read != 0 && info.family & TMPF_TRUETYPE == 0
+    }
+}
+
+#[cfg(not(windows))]
+fn raster_font() -> bool {
+    false
+}
+
+/// Whether a locale's character set is UTF-8: the part after the first '.', before any '@'
+/// modifier, so en_US.UTF-8, C.utf8 and de_DE.UTF-8@euro are; a locale with no '.' is read whole,
+/// as macOS sets LC_CTYPE=UTF-8. C and POSIX are not.
+fn utf8_locale(locale: &str) -> bool {
+    let codeset = locale.split_once('.').map_or(locale, |(_, rest)| rest);
+    let codeset = codeset.split_once('@').map_or(codeset, |(set, _)| set);
+    codeset.replace('-', "").eq_ignore_ascii_case("utf8")
+}
+
+/// Whether the terminal can show Unicode, and WRITECOLOREX_UNICODE's value when it holds something
+/// other than true or false, which is then set aside. WRITECOLOREX_UNICODE decides first.
+/// Otherwise, on Linux, macOS and FreeBSD the terminal cannot when the locale's character set is
+/// not UTF-8: the first of LC_ALL, LC_CTYPE and LANG that is set, and the C locale when none is.
+/// On Windows it cannot when the console is a window of the Windows console host itself and its
+/// screen buffer draws with a raster font. Takes no pipeline, so a linking module may call it.
+pub fn unicode_support() -> PsResult<(bool, Option<String>)> {
+    let mut unusable = None;
+    if let Some(value) = env_var("WRITECOLOREX_UNICODE")?.filter(|value| !value.is_empty()) {
+        if value.eq_ignore_ascii_case("true") {
+            return Ok((true, None));
+        }
+        if value.eq_ignore_ascii_case("false") {
+            return Ok((false, None));
+        }
+        unusable = Some(value);
+    }
+    if cfg!(windows) {
+        return Ok((!(console_host_window() && raster_font()), unusable));
+    }
+    for name in ["LC_ALL", "LC_CTYPE", "LANG"] {
+        if let Some(locale) = env_var(name)?.filter(|locale| !locale.is_empty()) {
+            return Ok((utf8_locale(&locale), unusable));
+        }
+    }
+    Ok((false, unusable))
+}
+
 /// The warning for PowerShell 7 in a window of the Windows console host.
 const CONSOLE_HOST_BOLD: &str = "The Windows console host (conhost) draws bold as brighter colors rather than a bold font, so Bold makes colors lighter. Windows Terminal draws a bold font.";
 
@@ -165,6 +257,7 @@ pub fn detect(ps: &Pipeline<'_>, silent: bool) -> PsResult<Detection> {
     let mut d = Detection {
         color_support: Support::None,
         bold_fonts: false,
+        unicode: true,
         ps_version: ps
             .variable("PSVersionTable")
             .and_then(|table| table.get("PSVersion"))
@@ -191,7 +284,16 @@ pub fn detect(ps: &Pipeline<'_>, silent: bool) -> PsResult<Detection> {
         warnings: Vec::new(),
     };
 
-    // FORCE_COLOR, NO_COLOR and TERM=dumb answer before anything else
+    // Unicode first, since the color variables below do not bear on it
+    let (unicode, unusable) = unicode_support()?;
+    d.unicode = unicode;
+    if let Some(value) = unusable
+        && !silent
+    {
+        ps.warning(&format!("WRITECOLOREX_UNICODE is '{value}'; it takes true or false, so whether the terminal can show Unicode is detected."))?;
+    }
+
+    // FORCE_COLOR, NO_COLOR and TERM=dumb decide before anything else
     match env_var("FORCE_COLOR")?.as_deref() {
         Some("0") => return Ok(d),
         Some("1") => {
@@ -541,23 +643,29 @@ pub fn detect(ps: &Pipeline<'_>, silent: bool) -> PsResult<Detection> {
 }
 
 /// The color support and bold rendering Write-ColorEX uses, detected on first use and kept for
-/// the session.
-static SESSION_SUPPORT: Mutex<Option<(Support, bool)>> = Mutex::new(None);
+/// the session: 0 before detection, else 1 + the support's place in SUPPORTS x 2 + 1 when fonts
+/// draw bold.
+static SESSION_SUPPORT: AtomicU8 = AtomicU8::new(0);
+
+/// The color modes in Support's order.
+const SUPPORTS: [Support; 4] = [Support::None, Support::Ansi4, Support::Ansi8, Support::TrueColor];
 
 pub fn session_support(ps: &Pipeline<'_>) -> PsResult<(Support, bool)> {
-    if let Some(found) = *SESSION_SUPPORT.lock().unwrap_or_else(|e| e.into_inner()) {
-        return Ok(found);
+    let kept = SESSION_SUPPORT.load(Ordering::Acquire);
+    if kept != 0 {
+        let code = kept - 1;
+        return Ok((SUPPORTS[usize::from(code >> 1)], code & 1 == 1));
     }
     let d = detect(ps, true)?;
     let found = (d.color_support, d.bold_fonts);
-    *SESSION_SUPPORT.lock().unwrap_or_else(|e| e.into_inner()) = Some(found);
+    SESSION_SUPPORT.store(1 + (found.0 as u8) * 2 + u8::from(found.1), Ordering::Release);
     Ok(found)
 }
 
 /// Forgets the session's detection, so the next Write-ColorEX call detects again; the module
 /// does this on import.
 pub fn reset_session_support() {
-    *SESSION_SUPPORT.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    SESSION_SUPPORT.store(0, Ordering::Release);
 }
 
 fn hashtable_of(pairs: &[(&str, PsObject)]) -> PsResult<PsHashtable> {
@@ -570,10 +678,13 @@ fn hashtable_of(pairs: &[(&str, PsObject)]) -> PsResult<PsHashtable> {
 
 /// Detects the terminal's ANSI color support and the styles it shows.
 ///
-/// Reads the environment and the host to answer which ANSI color mode the terminal supports
-/// (TrueColor, 256-color, 16-color or none), whether it draws bold as a bold font, and which text
-/// styles it shows. Write-ColorEX falls back to the modes it reports. FORCE_COLOR, NO_COLOR and
-/// TERM=dumb answer first; then COLORTERM, TERM and the terminal's own variables. On PowerShell 7.2
+/// Reads the environment and the host to find which ANSI color mode the terminal supports
+/// (TrueColor, 256-color, 16-color or none), whether it draws bold as a bold font, whether it can
+/// show Unicode, and which text styles it shows. Write-ColorEX falls back to the modes it reports.
+/// SupportsUnicode is WRITECOLOREX_UNICODE when that is true or false; otherwise it is false on
+/// Linux, macOS and FreeBSD when the locale's character set is not UTF-8, and on Windows when the
+/// console is a window of the Windows console host drawing with a raster font. FORCE_COLOR, NO_COLOR and
+/// TERM=dumb decide first; then COLORTERM, TERM and the terminal's own variables. On PowerShell 7.2
 /// and later, a host without virtual terminal support means none, since PowerShell removes escape
 /// codes from its output. In Windows PowerShell 5.1 in the Windows console host it switches on
 /// virtual terminal processing for the session when it is off.
@@ -618,7 +729,23 @@ impl Cmdlet for TestAnsiSupport {
         let result = pwrs::object::new_psobject("System.Management.Automation.PSCustomObject");
         pwrs::object::add_note(&result, "ColorSupport", d.color_support.as_str().into_ps()?)?;
         pwrs::object::add_note(&result, "SupportsBoldFonts", d.bold_fonts.into_ps()?)?;
+        pwrs::object::add_note(&result, "SupportsUnicode", d.unicode.into_ps()?)?;
         pwrs::object::add_note(&result, "Details", details.0)?;
         ps.write_object(&result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::utf8_locale;
+
+    #[test]
+    fn a_locale_is_utf8_by_its_character_set() {
+        for locale in ["en_US.UTF-8", "C.utf8", "de_DE.UTF-8@euro", "UTF-8", "en_GB.Utf-8"] {
+            assert!(utf8_locale(locale), "{locale} names UTF-8");
+        }
+        for locale in ["C", "POSIX", "ja_JP.eucJP", "en_US.ISO-8859-1", "en_US", ""] {
+            assert!(!utf8_locale(locale), "{locale} does not name UTF-8");
+        }
     }
 }

@@ -11,11 +11,11 @@ public sealed class PSColorStyleRegistration : IModuleAssemblyInitializer, IModu
 {
     private const string AcceleratorName = "PSColorStyle";
 
-    // Each import starts a new profile table with the built-in profiles, as importing
-    // PSWriteColorEX defines its class anew
+    // Each import puts back the built-in profiles and the default style and keeps the profiles
+    // added since, as importing PSWriteColorEX does; the table is the process's, kept from the
+    // first import
     public void OnImport()
     {
-        PSColorStyle.Profiles = new Hashtable(StringComparer.CurrentCultureIgnoreCase);
         PSColorStyle.InitializeDefaultProfiles();
         var accelerators = Accelerators();
         var add = accelerators?.GetMethod("Add", new[] { typeof(string), typeof(Type) });

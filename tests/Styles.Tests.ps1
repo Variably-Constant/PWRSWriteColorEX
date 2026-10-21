@@ -3,13 +3,13 @@
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'Common.ps1')
-    $saved = Save-ColorEnvironment
+    $script:saved = Save-ColorEnvironment
     # FORCE_COLOR writes a line of console colors alone as escape codes too, in every host
     Set-ColorEnvironment @{ FORCE_COLOR = '1' }
 }
 
 AfterAll {
-    Restore-ColorEnvironment $saved
+    Restore-ColorEnvironment $script:saved
     Import-PWRSWriteColorEX
 }
 
@@ -67,7 +67,7 @@ Describe 'The Write-Color* helpers' -Tag 'Styles' {
         Remove-EscapeCode $writes[1].Text | Should -Be 'b'
     }
 
-    It 'answers to its aliases' {
+    It 'works under its aliases' {
         Get-HostText { WCE 'x' } | Should -Be "$esc[1m$esc[91mx$esc[0m"
     }
 }
@@ -76,6 +76,14 @@ Describe 'PSColorStyle' -Tag 'Styles' {
     AfterEach {
         [PSColorStyle]::Profiles = @{}
         [PSColorStyle]::InitializeDefaultProfiles()
+    }
+
+    It 'keeps the profiles added since and puts back the built-in ones when the module is imported again' {
+        $null = New-ColorStyle -Name 'Kept' -ForegroundColor Magenta -AddToProfiles
+        [PSColorStyle]::Profiles['Info'].ForegroundColor = 'DarkRed'
+        Import-PWRSWriteColorEX
+        [PSColorStyle]::Profiles.ContainsKey('Kept') | Should -BeTrue
+        [PSColorStyle]::Profiles['Info'].ForegroundColor | Should -Be 'Cyan'
     }
 
     It 'starts with the seven built-in profiles' {
@@ -89,7 +97,7 @@ Describe 'PSColorStyle' -Tag 'Styles' {
         [PSColorStyle]::Profiles['WARNING'].ForegroundColor | Should -Be 'Yellow'
     }
 
-    It 'answers the Write-ColorEX parameters a style sets' {
+    It 'returns the Write-ColorEX parameters a style sets' {
         $style = [PSColorStyle]::new('Q', 'Red', 'Blue')
         $style.Bold = $true
         $style.StartTab = 2

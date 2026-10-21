@@ -5,7 +5,7 @@ use pwrs::prelude::*;
 
 use crate::log::resolve_log_folder;
 use crate::style::{helper_profile, write_color_params};
-use crate::write::{caller_script_root, render, WriteOptions};
+use crate::write::{caller_script_root, render, splat_refusal, WriteOptions};
 
 /// What every helper takes.
 struct HelperCall<'a> {
@@ -17,24 +17,32 @@ struct HelperCall<'a> {
 }
 
 /// Writes the text with a profile's settings, reading the profile from [PSColorStyle]::Profiles
-/// on each call so a change to it applies to the next.
+/// on each call so a change to it applies to the next. A setting Write-ColorEX does not take gives
+/// its error in place of the line, as one that does not stop the helper, as splatting the profile
+/// to Write-ColorEX gives it.
 fn write_with_profile(ps: &Pipeline<'_>, profile: &str, call: HelperCall<'_>) -> PsResult<()> {
     let params = write_color_params(&helper_profile(profile)?)?;
-    let mut options = WriteOptions::default();
-    options.apply_profile(&params, false)?;
-    options.text = call.text.map(<[String]>::to_vec).unwrap_or_default();
-    if call.no_new_line {
-        options.no_new_line = true;
+    if let Some(refusal) = splat_refusal(&params)? {
+        ps.write_error(&refusal)?;
+    } else {
+        let mut options = WriteOptions::default();
+        for refusal in options.apply_profile(&params, false)? {
+            ps.write_error(&refusal)?;
+        }
+        options.text = call.text.map(<[String]>::to_vec).unwrap_or_default();
+        if call.no_new_line {
+            options.no_new_line = true;
+        }
+        if !call.log_file.is_empty() {
+            // A bare -LogFile name goes in the folder of the script that called the helper
+            options.log_file = call.log_file.to_string();
+            options.log_path = resolve_log_folder(ps, &caller_script_root(ps))?;
+        }
+        if call.no_console_output {
+            options.no_console_output = true;
+        }
+        render(ps, options, &[], None)?;
     }
-    if !call.log_file.is_empty() {
-        // A bare -LogFile name goes in the folder of the script that called the helper
-        options.log_file = call.log_file.to_string();
-        options.log_path = resolve_log_folder(ps, &caller_script_root(ps))?;
-    }
-    if call.no_console_output {
-        options.no_console_output = true;
-    }
-    render(ps, options, &[], None)?;
 
     if call.pass_thru {
         match call.text {
@@ -57,7 +65,7 @@ fn write_with_profile(ps: &Pipeline<'_>, profile: &str, call: HelperCall<'_>) ->
 /// # Examples
 /// Write-ColorError 'Operation failed'
 /// 'first', 'second' | Write-ColorError -PassThru
-#[cmdlet(verb = "Write", noun = "ColorError", alias = ["WCE", "Write-ErrorColor", "Write-ErrorColour", "Write-ColourError", "WError", "wcerror"])]
+#[cmdlet(verb = "Write", noun = "ColorError", alias = ["WCE", "Write-ErrorColor", "Write-ErrorColour", "Write-ColourError", "WError", "wcerror"], output = ["System.String"])]
 #[derive(Default)]
 pub struct WriteColorError {
     /// The message. Several strings are written on one line; strings piped in are written one
@@ -105,7 +113,7 @@ impl WriteColorError {
 /// # Examples
 /// Write-ColorWarning 'This action may cause data loss'
 /// 'first', 'second' | Write-ColorWarning -PassThru
-#[cmdlet(verb = "Write", noun = "ColorWarning", alias = ["WCW", "Write-WarningColor", "Write-WarningColour", "Write-ColourWarning", "WWarning", "WCWarn", "wcwarning"])]
+#[cmdlet(verb = "Write", noun = "ColorWarning", alias = ["WCW", "Write-WarningColor", "Write-WarningColour", "Write-ColourWarning", "WWarning", "WCWarn", "wcwarning"], output = ["System.String"])]
 #[derive(Default)]
 pub struct WriteColorWarning {
     /// The message. Several strings are written on one line; strings piped in are written one
@@ -153,7 +161,7 @@ impl WriteColorWarning {
 /// # Examples
 /// Write-ColorInfo 'Processing 150 files'
 /// 'first', 'second' | Write-ColorInfo -PassThru
-#[cmdlet(verb = "Write", noun = "ColorInfo", alias = ["WCI", "Write-InfoColor", "Write-InfoColour", "Write-ColourInfo", "WInfo", "wcinfo"])]
+#[cmdlet(verb = "Write", noun = "ColorInfo", alias = ["WCI", "Write-InfoColor", "Write-InfoColour", "Write-ColourInfo", "WInfo", "wcinfo"], output = ["System.String"])]
 #[derive(Default)]
 pub struct WriteColorInfo {
     /// The message. Several strings are written on one line; strings piped in are written one
@@ -201,7 +209,7 @@ impl WriteColorInfo {
 /// # Examples
 /// Write-ColorSuccess 'Deployment completed'
 /// 'first', 'second' | Write-ColorSuccess -PassThru
-#[cmdlet(verb = "Write", noun = "ColorSuccess", alias = ["WCS", "Write-SuccessColor", "Write-SuccessColour", "Write-ColourSuccess", "WSuccess", "wcok", "wcsuccess"])]
+#[cmdlet(verb = "Write", noun = "ColorSuccess", alias = ["WCS", "Write-SuccessColor", "Write-SuccessColour", "Write-ColourSuccess", "WSuccess", "wcok", "wcsuccess"], output = ["System.String"])]
 #[derive(Default)]
 pub struct WriteColorSuccess {
     /// The message. Several strings are written on one line; strings piped in are written one
@@ -249,7 +257,7 @@ impl WriteColorSuccess {
 /// # Examples
 /// Write-ColorCritical 'Database connection lost'
 /// 'first', 'second' | Write-ColorCritical -PassThru
-#[cmdlet(verb = "Write", noun = "ColorCritical", alias = ["WCC", "Write-CriticalColor", "Write-CriticalColour", "Write-ColourCritical", "WCritical", "wccritical"])]
+#[cmdlet(verb = "Write", noun = "ColorCritical", alias = ["WCC", "Write-CriticalColor", "Write-CriticalColour", "Write-ColourCritical", "WCritical", "wccritical"], output = ["System.String"])]
 #[derive(Default)]
 pub struct WriteColorCritical {
     /// The message. Several strings are written on one line; strings piped in are written one
@@ -297,7 +305,7 @@ impl WriteColorCritical {
 /// # Examples
 /// Write-ColorDebug 'Variable value: 42'
 /// 'first', 'second' | Write-ColorDebug -PassThru
-#[cmdlet(verb = "Write", noun = "ColorDebug", alias = ["WCD", "Write-DebugColor", "Write-DebugColour", "Write-ColourDebug", "WDebug", "wcdebug"])]
+#[cmdlet(verb = "Write", noun = "ColorDebug", alias = ["WCD", "Write-DebugColor", "Write-DebugColour", "Write-ColourDebug", "WDebug", "wcdebug"], output = ["System.String"])]
 #[derive(Default)]
 pub struct WriteColorDebug {
     /// The message. Several strings are written on one line; strings piped in are written one

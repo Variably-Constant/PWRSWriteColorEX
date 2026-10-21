@@ -4,6 +4,7 @@
 //! which IEEE 754 rounds the same everywhere.
 
 use crate::colors::round_even;
+use crate::set_once::SetOnce;
 
 /// The bit patterns of the linear value of each sRGB channel value 0-255: ((c / 255 + 0.055) /
 /// 1.055) ^ 2.4, or c / 255 / 12.92 at the dark end. It rises, so a linear value finds its
@@ -75,7 +76,7 @@ const SRGB_TO_LINEAR_BITS: [u64; 256] = [
     0x3FEF2676BCD69ADE, 0x3FEF6E98B4C51466, 0x3FEFB71BBEC33AB2, 0x3FF0000000000000,
 ];
 
-fn srgb_to_linear(channel: i64) -> f64 {
+pub(crate) fn srgb_to_linear(channel: i64) -> f64 {
     f64::from_bits(SRGB_TO_LINEAR_BITS[channel.clamp(0, 255) as usize])
 }
 
@@ -116,7 +117,7 @@ const B2: f64 = -f64::from_bits(0x3FE68267C131178D);
 const B3: f64 = f64::from_bits(0x3FFB5263CAEF6BCD);
 
 /// The cube root of a number from 0 to 1, by 40 Newton steps from 1, which use only *, + and /.
-fn cube_root(value: f64) -> f64 {
+pub(crate) fn cube_root(value: f64) -> f64 {
     if value <= 0.0 {
         return 0.0;
     }
@@ -138,9 +139,97 @@ pub fn to_oklab(rgb: [i64; 3]) -> [f64; 3] {
     [LL * l + LM * m + LS * s, AL * l + AM * m + AS * s, BL * l + BM * m + BS * s]
 }
 
+/// The weight of the difference in lightness in `nearest_ansi8`'s distance: 0.6, which keeps a
+/// dark saturated color on a code of its own hue rather than the gray of its lightness.
+const LIGHTNESS_WEIGHT: f64 = f64::from_bits(0x3FE3333333333333);
+
+/// The OKLab coordinates of the 256-color codes 16-255, at index code - 16: the 6x6x6 cube, whose
+/// channel steps are 0, 95, 135, 175, 215 and 255, then the 24 grays, 8 to 238 by 10.
+fn ansi8_labs() -> &'static [[f64; 3]; 240] {
+    static LABS: SetOnce<[[f64; 3]; 240]> = SetOnce::new();
+    LABS.get_or_init(|| {
+        const STEPS: [i64; 6] = [0, 95, 135, 175, 215, 255];
+        let mut labs = [[0.0f64; 3]; 240];
+        for (i, lab) in labs.iter_mut().enumerate() {
+            let rgb = if i < 216 {
+                [STEPS[i / 36], STEPS[(i / 6) % 6], STEPS[i % 6]]
+            } else {
+                let gray = 8 + 10 * (i as i64 - 216);
+                [gray, gray, gray]
+            };
+            *lab = to_oklab(rgb);
+        }
+        labs
+    })
+}
+
+/// The 256-color code nearest an sRGB color by OKLab distance, of codes 16-255, the lower code of
+/// two as near; codes 0-15 are left out, since the terminal's scheme sets their colors. The
+/// distance is (LIGHTNESS_WEIGHT x the difference in L) squared, plus the squared differences in a
+/// and b, added in that order, as PSWriteColorEX's ColorMath.NearestAnsi8 adds them.
+pub fn nearest_ansi8(rgb: [i64; 3]) -> i64 {
+    let lab = to_oklab(rgb.map(|v| v.clamp(0, 255)));
+    let mut best_code = 16;
+    let mut best_distance = f64::MAX;
+    for (i, entry) in ansi8_labs().iter().enumerate() {
+        let dl = (entry[0] - lab[0]) * LIGHTNESS_WEIGHT;
+        let da = entry[1] - lab[1];
+        let db = entry[2] - lab[2];
+        let distance = dl * dl + da * da + db * db;
+        if distance < best_distance {
+            best_distance = distance;
+            best_code = i as i64 + 16;
+        }
+    }
+    best_code
+}
+
+/// The sRGB color of a 256-color code 16-255: the 6x6x6 cube, whose channel steps are 0, 95, 135,
+/// 175, 215 and 255, then the 24 grays, 8 to 238 by 10.
+pub fn ansi8_rgb(code: i64) -> [i64; 3] {
+    if code >= 232 {
+        let gray = 8 + 10 * (code - 232);
+        return [gray, gray, gray];
+    }
+    const STEPS: [i64; 6] = [0, 95, 135, 175, 215, 255];
+    let i = (code - 16) as usize;
+    [STEPS[i / 36], STEPS[(i / 6) % 6], STEPS[i % 6]]
+}
+
+// The relative luminance weights of red, green and blue, the 0.05 the contrast ratio adds to a
+// luminance, and white's luminance plus that 0.05
+const LUMINANCE_RED: f64 = f64::from_bits(0x3FCB367A0F9096BC);
+const LUMINANCE_GREEN: f64 = f64::from_bits(0x3FE6E2EB1C432CA5);
+const LUMINANCE_BLUE: f64 = f64::from_bits(0x3FB27BB2FEC56D5D);
+const CONTRAST_OFFSET: f64 = f64::from_bits(0x3FA999999999999A);
+const WHITE_CONTRAST: f64 = f64::from_bits(0x3FF0CCCCCCCCCCCD);
+
+/// The relative luminance of an sRGB color: its linear red, green and blue times their weights,
+/// added in that order, as PSWriteColorEX's ColorMath.RelativeLuminance adds them.
+fn relative_luminance(rgb: [i64; 3]) -> f64 {
+    LUMINANCE_RED * srgb_to_linear(rgb[0]) + LUMINANCE_GREEN * srgb_to_linear(rgb[1]) + LUMINANCE_BLUE * srgb_to_linear(rgb[2])
+}
+
+/// Whether black text on an sRGB color has a higher contrast ratio than white text: (Y + 0.05) /
+/// 0.05 against 1.05 / (Y + 0.05), Y the color's relative luminance, compared as (Y + 0.05) squared
+/// against 0.05 x 1.05, as PSWriteColorEX's ColorMath.BlackTextReads compares them.
+pub fn black_text_reads(rgb: [i64; 3]) -> bool {
+    let shifted = relative_luminance(rgb) + CONTRAST_OFFSET;
+    shifted * shifted > CONTRAST_OFFSET * WHITE_CONTRAST
+}
+
+/// The contrast ratio of two sRGB colors as WCAG 2 defines it, from 1 to 21: (L1 + 0.05) /
+/// (L2 + 0.05), L1 the higher relative luminance and L2 the lower, as PSWriteColorEX's
+/// ColorMath.ContrastRatio computes it.
+pub fn contrast_ratio(first: [i64; 3], second: [i64; 3]) -> f64 {
+    let first = relative_luminance(first) + CONTRAST_OFFSET;
+    let second = relative_luminance(second) + CONTRAST_OFFSET;
+    if first >= second { first / second } else { second / first }
+}
+
 /// The sRGB channel value 0-255 whose linear value is nearest the one given; the lower of two as
 /// near. Below 0 is 0 and above 1 is 255.
-fn from_linear(value: f64) -> i64 {
+pub(crate) fn from_linear(value: f64) -> i64 {
     if value <= 0.0 {
         return 0;
     }
@@ -184,6 +273,12 @@ pub fn from_hsl(hue: f64, saturation: f64, lightness: f64) -> [i64; 3] {
     let h = hue - 360.0 * (hue / 360.0).floor();
     let s = saturation.clamp(0.0, 100.0) / 100.0;
     let l = lightness.clamp(0.0, 100.0) / 100.0;
+    hsl_to_rgb(h, s, l)
+}
+
+/// The sRGB channel values of a hue in degrees from 0 to 360 and a saturation and lightness from
+/// 0 to 1, by from_hsl's formula.
+pub(crate) fn hsl_to_rgb(h: f64, s: f64, l: f64) -> [i64; 3] {
     let chroma = (1.0 - (2.0 * l - 1.0).abs()) * s;
     let sector = h / 60.0;
     let x = chroma * (1.0 - ((sector - 2.0 * (sector / 2.0).floor()) - 1.0).abs());
@@ -217,6 +312,53 @@ mod tests {
         assert_eq!(format!("{:.15}", lab[1]), "0.224863061065974");
         assert_eq!(format!("{:.15}", lab[2]), "0.125846298530735");
         assert_eq!(from_oklab(lab), [255, 0, 0]);
+    }
+
+    #[test]
+    fn nearest_ansi8_by_weighted_oklab() {
+        assert_eq!(nearest_ansi8([110, 51, 255]), 57);
+        assert_eq!(nearest_ansi8([56, 33, 255]), 21);
+        assert_eq!(nearest_ansi8([0, 51, 102]), 17);
+        assert_eq!(nearest_ansi8([128, 128, 128]), 244);
+        assert_eq!(nearest_ansi8([255, 128, 0]), 208);
+        assert_eq!(nearest_ansi8([300, -5, 0]), 196);
+    }
+
+    #[test]
+    fn nearest_ansi8_returns_each_code_for_its_own_color() {
+        const STEPS: [i64; 6] = [0, 95, 135, 175, 215, 255];
+        for code in 16..=255i64 {
+            let rgb = if code >= 232 {
+                let gray = 8 + 10 * (code - 232);
+                [gray, gray, gray]
+            } else {
+                let i = (code - 16) as usize;
+                [STEPS[i / 36], STEPS[(i / 6) % 6], STEPS[i % 6]]
+            };
+            assert_eq!(nearest_ansi8(rgb), code);
+        }
+    }
+
+    #[test]
+    fn black_text_from_a_relative_luminance_of_about_0_179() {
+        assert!(!black_text_reads([0, 0, 0]));
+        assert!(!black_text_reads([117, 117, 117]));
+        assert!(black_text_reads([118, 118, 118]));
+        assert!(black_text_reads([255, 255, 255]));
+        assert!(black_text_reads([255, 0, 0]));
+        assert!(!black_text_reads([0, 0, 255]));
+        assert_eq!(ansi8_rgb(208), [255, 135, 0]);
+        assert_eq!(ansi8_rgb(240), [88, 88, 88]);
+    }
+
+    #[test]
+    fn contrast_ratios_run_from_1_to_21_either_way_round() {
+        assert!((contrast_ratio([0, 0, 0], [255, 255, 255]) - 21.0).abs() < 1e-12);
+        assert_eq!(contrast_ratio([255, 255, 255], [0, 0, 0]).to_bits(), contrast_ratio([0, 0, 0], [255, 255, 255]).to_bits());
+        assert_eq!(contrast_ratio([30, 30, 46], [30, 30, 46]), 1.0);
+        assert!((contrast_ratio([255, 0, 0], [255, 255, 255]) - 3.998).abs() < 0.001);
+        assert!((contrast_ratio([229, 229, 229], [0, 0, 0]) - 16.67).abs() < 0.01);
+        assert_eq!(contrast_ratio([300, -5, 0], [255, 0, 0]), 1.0);
     }
 
     #[test]

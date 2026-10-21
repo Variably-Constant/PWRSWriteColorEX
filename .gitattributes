@@ -1,0 +1,5 @@
+# The theme files and the help topic are copies of PSWriteColorEX's, with LF line ends; every
+# checkout keeps them so, whatever the platform's line ends, since the library embeds the themes
+# and a test compares both with PSWriteColorEX's
+themes/*.json text eol=lf
+en-US/*.txt text eol=lf

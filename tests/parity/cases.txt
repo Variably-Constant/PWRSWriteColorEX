@@ -86,6 +86,17 @@ Write-ColorEX -Text "a$([char]::ConvertFromUtf32(0x1F600))b" -Gradient Red, Blue
 Write-ColorEX -Text 'abcdef' -Gradient '#202020', '#E0E0E0' -ANSI8
 Write-ColorEX -Text 'ab' -Gradient Red, Blue -Bold -Underline
 Write-ColorEX -Text 'ab' -Gradient Red, Blue -ANSI4
+Write-ColorEX -Text 'Six stops make a rainbow' -Gradient Red, Yellow, Green, Cyan, Blue, Magenta
+Write-ColorEX -Text 'Six stops make a rainbow' -Gradient Red, Yellow, Green, Cyan, Blue, Magenta -ANSI8
+Write-ColorEX -Text 'a b c' -Gradient Red, Blue -Underline
+Write-ColorEX -Text 'a b c' -Gradient Red, Blue -Reverse
+Write-ColorEX -Text '[underline]a b[/] c d' -Gradient Red, Blue -Markup
+Write-ColorEX -Text 'a b', 'c d' -Gradient Red, Blue -Style 'CrossedOut', 'Bold'
+Write-ColorEX -Text 'x y', 'z w' -Gradient Red, Blue -UnderlineColor Green, None
+Write-ColorEX -Text 'a b c' -Color White -BackGroundGradient Red, Blue
+Write-ColorEX -Text '   ' -Gradient Red, Blue
+Write-ColorEX -Text 'x' -Color Lime -ANSI8
+Write-ColorEX -Text 'a', 'b', 'c' -Color '#00FF00', '#003366', '#6E33FF' -ANSI8
 # Layout
 Write-ColorEX -Text 'x' -StartTab 2
 Write-ColorEX -Text 'x' -StartSpaces 3
@@ -370,6 +381,106 @@ Write-ColorEX -Text 'gradient' -Gradient Red, Yellow, Blue -GradientSpace RGB -A
 Write-ColorEX -Text 'gradient' -Gradient Black, White -ANSI8
 Write-ColorEX -Text 'gradient' -BackGroundGradient '#123456', '#FEDCBA' -GradientSpace RGB
 Write-ColorEX -Text 'g' -Gradient Red, Blue -StyleProfile (New-ColorStyle -Name 'gs' -GradientSpace RGB)
+# Gradient options
+foreach ($s in 'OKLab', 'RGB', 'LinearRGB', 'OKLCH', 'HSL', 'HSV', 'Lab', 'LCh') { Write-ColorEX -Text "blended in $s" -Gradient Red, Yellow, Blue -GradientSpace $s -TrueColor }
+foreach ($s in 'LinearRGB', 'OKLCH', 'HSL', 'HSV', 'Lab', 'LCh') { Write-ColorEX -Text "$s in 256 colors" -Gradient '#FF8800', '#0088FF' -GradientSpace $s -ANSI8 }
+foreach ($h in 'Shorter', 'Longer', 'Increasing', 'Decreasing') { foreach ($s in 'OKLCH', 'HSL', 'HSV', 'LCh') { Write-ColorEX -Text "the $h way in $s" -Gradient Red, Blue -GradientSpace $s -GradientHue $h -TrueColor } }
+foreach ($s in 'OKLCH', 'HSL', 'HSV', 'LCh') { Write-ColorEX -Text "gray to red in $s" -Gradient Gray, Red, White -GradientSpace $s -TrueColor }
+Write-ColorEX -Text 'a hue path in OKLab' -Gradient Red, Blue -GradientHue Longer -TrueColor
+foreach ($e in 'Linear', 'InSine', 'OutSine', 'InOutSine', 'InQuad', 'OutQuad', 'InOutQuad', 'InCubic', 'OutCubic', 'InOutCubic', 'InQuart', 'OutQuart', 'InOutQuart', 'InQuint', 'OutQuint', 'InOutQuint', 'InExpo', 'OutExpo', 'InOutExpo', 'InCirc', 'OutCirc', 'InOutCirc', 'InBack', 'OutBack', 'InOutBack', 'InElastic', 'OutElastic', 'InOutElastic', 'InBounce', 'OutBounce', 'InOutBounce') { Write-ColorEX -Text "eased $e" -Gradient Black, White -GradientEasing $e -TrueColor }
+foreach ($e in 'InBack', 'OutElastic', 'InOutBounce') { Write-ColorEX -Text "$e in RGB" -Gradient Red, Lime, Blue -GradientEasing $e -GradientSpace RGB -TrueColor }
+foreach ($r in 'None', 'Repeat', 'Mirror') { Write-ColorEX -Text 'a repeating gradient across this text' -Gradient 'Red@0', 'Blue@25' -GradientRepeat $r -TrueColor }
+foreach ($r in 'Repeat', 'Mirror') { Write-ColorEX -Text 'even stops do not repeat' -Gradient Red, Blue -GradientRepeat $r -TrueColor }
+foreach ($d in 'Forward', 'Reverse', 'CenterOut', 'EdgesIn') { Write-ColorEX -Text 'running every way' -Gradient Red, Yellow, Blue -GradientDirection $d -TrueColor }
+foreach ($d in 'Forward', 'Reverse', 'CenterOut', 'EdgesIn') { Write-ColorEX -Text 'abcdefgh' -Gradient 'Red', 'Gold@30', 'Blue' -GradientDirection $d -GradientRepeat Mirror -GradientEasing InOutCubic -TrueColor }
+foreach ($d in 'CenterOut', 'EdgesIn') { Write-ColorEX -Text 'abc' -Gradient Red, Green, Blue -GradientDirection $d -TrueColor }
+foreach ($n in 0, 1, 2, 3, 4, 7) { Write-ColorEX -Text 'banded gradient text' -Gradient Green, Yellow, Red -GradientSteps $n -TrueColor }
+Write-ColorEX -Text 'bands in 256 colors' -Gradient Black, White -GradientSteps 4 -ANSI8
+Write-ColorEX -Text 'bands, mirrored from the middle' -Gradient 'Navy@0', 'Gold@40' -GradientSteps 3 -GradientRepeat Mirror -GradientDirection CenterOut -GradientSpace HSL -TrueColor
+Write-ColorEX -Text 'x' -Gradient Red, Blue -GradientSteps -1
+Write-ColorEX -Text 'x' -Gradient Red, Blue -GradientEasing EaseIn
+(TabExpansion2 -inputScript 'Write-ColorEX -GradientEasing InOut' -cursorColumn 35).CompletionMatches.CompletionText -join ','
+# Placed gradient stops
+Write-ColorEX -Text 'placed stops' -Gradient 'Red', 'Gold@40', 'Blue' -TrueColor
+Write-ColorEX -Text 'placed stops' -Gradient 'Red@10', 'Gold@30%', 'Blue@60' -TrueColor
+Write-ColorEX -Text 'out of order' -Gradient 'Red', 'Gold@60', 'Blue@20', 'Green' -TrueColor
+Write-ColorEX -Text 'a hard stop' -Gradient 'Black', 'White@50', 'Black@50', 'White' -TrueColor
+Write-ColorEX -Text 'decimals' -Gradient '#FF0000@12.5', '#0000FF@87.5' -TrueColor
+Write-ColorEX -Text 'past the end' -Gradient 'Red', 'Blue@250' -TrueColor
+Write-ColorEX -Text 'not places' -Gradient 'Red@', 'Blue@x', 'Green@1.2.3' -TrueColor
+Write-ColorEX -Text 'placed forms' -Gradient '#F00@20', 'rgb(0, 0, 255) @ 80', @(0, 255, 0) -TrueColor
+Write-ColorEX -Text 'placed in 256 colors' -Gradient 'Red', 'Gold@40', 'Blue' -ANSI8
+Write-ColorEX -Text 'ab' -Gradient 'Red', 'Gold@40', 'Blue'
+Write-ColorEX -Text 'x' -Gradient 'Sunset@50'
+Write-ColorEX -Text 'a placed background' -Color White -BackGroundGradient 'Navy', 'Teal@70' -TrueColor
+Format-ColorEX -Text 'formatted with options' -Gradient 'Red', 'Gold@25', 'Blue' -GradientSpace OKLCH -GradientEasing OutQuad -TrueColor
+'one placed line', 'another placed line' | Write-ColorEX -Gradient 'Red@20', 'Blue@80' -GradientRepeat Mirror -TrueColor
+Write-ColorEX -Text 'debugged options' -Gradient 'Red', 'Gold@40', 'Blue' -GradientSpace LCh -GradientSteps 4 -Debugging -Verbose
+# Gradient options in styles
+Write-ColorEX -Text 'every option from a style' -StyleProfile (New-ColorStyle -Name 'go' -Gradient Red, Blue -GradientSpace OKLCH -GradientHue Longer -GradientEasing InOutSine -GradientRepeat Mirror -GradientDirection CenterOut -GradientSteps 5) -TrueColor
+Write-ColorEX -Text 'given beats the style' -GradientSpace RGB -StyleProfile (New-ColorStyle -Name 'gb' -Gradient Red, Blue -GradientSpace HSL) -TrueColor
+$n = New-ColorStyle -Name 'gp' -GradientSpace HSL -GradientHue Increasing -GradientEasing OutBounce -GradientRepeat Repeat -GradientDirection EdgesIn -GradientSteps 3; Show-Value $n.ToWriteColorParams(); $c = $n.Clone(); $c.GradientHue; $c.GradientEasing; $c.GradientRepeat; $c.GradientDirection; $c.GradientSteps
+$n = [PSColorStyle]::new('Blank'); $n.GradientHue; $n.GradientEasing; $n.GradientRepeat; $n.GradientDirection; $n.GradientSteps
+$s = New-ColorStyle -Name 'Opts' -Gradient Sunset -GradientSpace LCh -GradientHue Decreasing -GradientEasing InBack -GradientRepeat Mirror -GradientDirection Reverse -GradientSteps 6 -AddToProfiles; Show-ColorTable -Profiles Opts; Export-ColorProfile -Path "$TestDir/o.json" -Name Opts; Get-Content "$TestDir/o.json" -Raw; Remove-ColorProfile Opts; Import-ColorProfile -Path "$TestDir/o.json" -PassThru | ForEach-Object { Show-Value $_.ToWriteColorParams() }; Remove-Item "$TestDir/o.json"; Remove-ColorProfile Opts
+$s = New-ColorStyle -Name 'BadOpts' -AddToProfiles; $s.GradientHue = 'Sideways'; Show-ColorTable -Profiles BadOpts, Warning; $s.GradientHue = ''; $s.GradientEasing = 'EaseIn'; Show-ColorTable -Profiles BadOpts; $s.GradientEasing = 'outbounce'; $s.GradientRepeat = 'Twice'; Show-ColorTable -Profiles BadOpts; $s.GradientRepeat = ''; $s.GradientDirection = 'Up'; Show-ColorTable -Profiles BadOpts; Remove-ColorProfile BadOpts
+$s = New-ColorStyle -Name 'bs' -Gradient Red, Blue; $s.GradientSpace = 'Wavy'; Write-ColorEX -Text 'a bad space' -StyleProfile $s -TrueColor; 'after'
+$s = New-ColorStyle -Name 'bu'; $s.UnderlineStyle = 'Wavy'; Write-ColorEX -Text 'a bad underline' -StyleProfile $s -Underline; 'after'
+$s = New-ColorStyle -Name 'bd' -Gradient Red, Blue -GradientEasing InQuad; $s.GradientDirection = 'Sideways'; Write-ColorEX -Text 'a bad direction' -StyleProfile $s -TrueColor
+$s = New-ColorStyle -Name 'bf' -Gradient Red, Blue; $s.GradientRepeat = 'Twice'; Format-ColorEX -Text 'formatted, bad repeat' -StyleProfile $s -TrueColor
+$e = [PSColorStyle]::Profiles['Error']; $e.GradientEasing = 'Wobble'; Write-ColorError 'a helper with a bad easing' -PassThru; [PSColorStyle]::InitializeDefaultProfiles()
+$e = [PSColorStyle]::Profiles['Warning']; $e.UnderlineStyle = 'Wavy'; Write-ColorWarning 'a helper with a bad underline' -PassThru; [PSColorStyle]::InitializeDefaultProfiles()
+Set-ColorDefault -Style (New-ColorStyle -Name 'dd' -Gradient Neon -GradientEasing InQuad -GradientDirection Reverse); Write-ColorEX -Text 'an eased default' -Default -TrueColor; [PSColorStyle]::InitializeDefaultProfiles()
+$d = New-ColorStyle -Name 'bdd' -Gradient Neon; $d.GradientHue = 'Upward'; Set-ColorDefault -Style $d; Write-ColorEX -Text 'a bad default' -Default -TrueColor; [PSColorStyle]::InitializeDefaultProfiles()
+# Get-GradientColor
+Get-GradientColor -Gradient Red, Blue -Count 5
+Get-GradientColor Progress -Count 7 -GradientSpace OKLCH -GradientHue Longer
+Get-GradientColor -Gradient 'Red', 'Gold@40', 'Blue' -Count 10 -GradientEasing InOutSine -GradientRepeat Mirror -GradientDirection CenterOut -GradientSteps 4
+Get-GradientColor -Gradient Sunset -Count 2
+Get-GradientColor -Gradient Sunset -Count 1
+foreach ($p in 0, 0.1, 0.333, 0.5, 0.7775, 1, -2, 7) { Get-GradientColor -Gradient Progress -Place $p }
+Get-GradientColor -Gradient 'Red@0', 'Blue@25' -Place 0.6 -GradientRepeat Repeat -GradientSpace RGB
+Get-GradientColor -Gradient Red, Blue -Place ([double]::NaN)
+Get-GradientColor -Gradient Black, White -Place 0.5 -GradientEasing InQuad -GradientDirection Reverse
+Get-GradientColor -Gradient Progress -Place (0..100 | ForEach-Object { $_ / 100 })
+Get-GradientColor -Gradient Progress -Place 0.75, 0.25, 7, -2, ([double]::NaN), 0.5
+Get-GradientColor -Gradient 'Red@10', 'Gold@40', 'Blue@80' -Place 0, 0.1, 0.25, 0.4, 0.6, 0.8, 1 -GradientRepeat Mirror -GradientSpace OKLCH
+$all = @(Get-GradientColor -Gradient Sunset -Place 0.1, 0.9 -GradientSteps 3); $one = @((Get-GradientColor -Gradient Sunset -Place 0.1 -GradientSteps 3), (Get-GradientColor -Gradient Sunset -Place 0.9 -GradientSteps 3)); $all.Count; ($all | ForEach-Object { $_ -join ',' }) -join ' '; ($one | ForEach-Object { $_ -join ',' }) -join ' '; $all[1].GetType().Name
+Get-GradientColor -Gradient Red, Blue -Place @()
+Get-GradientColor -Gradient Red, Blue -Place $null
+Get-GradientColour -Gradient Red, Blue -Count 3
+Get-GradientColor -Gradient Red -Count 3
+Get-GradientColor -Gradient NoSuchColor, Blue -Count 3
+Get-GradientColor -Gradient '#XYZ', Blue -Count 3
+Get-GradientColor -Gradient '#F00', 'hsl(240, 100%, 50%)' -Place 0.5
+Get-GradientColor -Gradient @(255, 0, 0), @(0, 0, 255) -Count 3
+Get-GradientColor -Gradient Red, Blue -Count 0
+Get-GradientColor -Gradient Red, Blue -Count 3 -Place 0.5
+Get-GradientColor -Gradient Red, Blue -Count 3 -GradientSpace Wavy
+$c = Get-GradientColor -Gradient Red, Blue -Count 3; $c[0][0] = 9; Get-GradientColor -Gradient Red, Blue -Count 3
+$colors = Get-GradientColor -Gradient Sunset -Count 3 -GradientSpace OKLCH; Write-ColorEX -Text 'one ', 'two ', 'three' -Color $colors
+(TabExpansion2 -inputScript 'Get-GradientColor -Gradient Pro' -cursorColumn 31).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
+# Get-ColorContrast
+Get-ColorContrast White Black
+Get-ColorContrast -Color Black -BackGroundColor White
+Get-ColourContrast '#E5E5E5' '#000000'
+foreach ($gray in 0..255) { [BitConverter]::DoubleToInt64Bits((Get-ColorContrast @($gray, $gray, $gray) '#1E1E2E')) }
+foreach ($channel in 0..255) { [BitConverter]::DoubleToInt64Bits((Get-ColorContrast @($channel, 0, 0) @(0, $channel, 255))) }
+foreach ($pair in @(@('Red', 'White'), @('Gold', 'Navy'), @('#F80', 'rgb(0, 0, 0)'), @('hsl(200, 80%, 40%)', 'LightGray'), @('Crimson', 'Crimson'), @('#e5e5e5', 'black'))) { [BitConverter]::DoubleToInt64Bits((Get-ColorContrast $pair[0] $pair[1])) }
+[BitConverter]::DoubleToInt64Bits((Get-ColorContrast -C @(229, 229, 229) -BGC @(0, 0, 0)))
+[BitConverter]::DoubleToInt64Bits((Get-ColorContrast -ForegroundColor ([byte[]](10, 20, 30)) -B ([long[]](200, 100, 0))))
+Register-ColorName Brand '#FF6B35'; Get-ColorContrast Brand White; Unregister-ColorName Brand
+Get-ColorContrast NoSuchColor White
+Get-ColorContrast '#XYZ' White
+Get-ColorContrast White @(255, 0)
+Get-ColorContrast @(256, 0, 0) @(0, 0, 0)
+Get-ColorContrast @(1.5, 0, 0) Black
+Get-ColorContrast 7 Black
+Get-ColorContrast NoSuchColor NoSuchEither
+Get-ColorContrast $null White
+Get-ColorContrast White ''
+Get-ColorContrast White
+(TabExpansion2 -inputScript 'Get-ColorContrast -Color Crim' -cursorColumn 29).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
+(TabExpansion2 -inputScript 'Get-ColorContrast White -BackGroundColor Nav' -cursorColumn 44).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
 # Truncating, centering and wrapping
 Write-ColorEX -Text 'abcdefgh' -AutoPad 5 -Truncate
 Write-ColorEX -Text 'ab', 'cdef', 'gh' -AutoPad 5 -Truncate -Color Red, Green, Blue
@@ -513,6 +624,47 @@ $env:CLICOLOR_FORCE = '1'; $old = $env:TERM; $env:TERM = 'dumb'; Write-ColorEX -
 $old = $env:TERM; $env:TERM = 'DUMB'; Write-ColorEX -Text 'x' -Color Red -Bold; $env:TERM = $old
 $env:CLICOLOR = '0'; Write-ColorEX -Text 'x' -Color Red -Debugging -Verbose; $env:CLICOLOR = $null
 $env:CLICOLOR = '0'; (Test-AnsiSupport -Silent).ColorSupport; $env:CLICOLOR = $null
+# SupportsUnicode
+(Test-AnsiSupport -Silent).PSObject.Properties.Name -join ','
+(Test-AnsiSupport -Silent).SupportsUnicode
+foreach ($v in 'true', 'false', 'TRUE', 'False') { $env:WRITECOLOREX_UNICODE = $v; "$v $((Test-AnsiSupport -Silent).SupportsUnicode)" }; $env:WRITECOLOREX_UNICODE = $null
+$env:WRITECOLOREX_UNICODE = 'yes'; (Test-AnsiSupport -Silent).SupportsUnicode; $env:WRITECOLOREX_UNICODE = $null
+$env:WRITECOLOREX_UNICODE = '1'; $w = $null; $r = Test-AnsiSupport -WarningVariable w -WarningAction SilentlyContinue; @($w | Where-Object { "$_" -like 'WRITECOLOREX_UNICODE*' }) | ForEach-Object { "$_" }; $env:WRITECOLOREX_UNICODE = $null
+$env:WRITECOLOREX_UNICODE = 'false'; $env:FORCE_COLOR = '3'; (Test-AnsiSupport -Silent).SupportsUnicode; $env:FORCE_COLOR = $null; $env:WRITECOLOREX_UNICODE = $null
+$saved = @($env:LC_ALL, $env:LC_CTYPE, $env:LANG); foreach ($l in @('', '', 'en_US.UTF-8'), @('', '', 'C'), @('', 'UTF-8', 'C'), @('C', 'en_US.UTF-8', 'en_US.UTF-8'), @('de_DE.UTF-8@euro', '', ''), @('', '', 'ja_JP.eucJP'), @('', '', '')) { $env:LC_ALL = $l[0]; $env:LC_CTYPE = $l[1]; $env:LANG = $l[2]; "$($l -join '|') $((Test-AnsiSupport -Silent).SupportsUnicode)" }; $env:LC_ALL = $saved[0]; $env:LC_CTYPE = $saved[1]; $env:LANG = $saved[2]
+# -ColorSupport
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Format-ColorEX -Text 'name', 'hex', 'rgb', 'n8' -Color Red, '#FF8000', @(10, 200, 30), 208 -BackGroundColor DarkBlue -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Write-ColorEX -Text 'name', 'hex', 'rgb' -Color Red, '#FF8000', @(10, 200, 30) -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Write-ColorEX -Text 'plain', 'console' -Color Green, DarkYellow -BackGroundColor $null, DarkBlue -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Write-ColorEX -Text 'a gradient' -Gradient Red, Blue -BackGroundGradient Black, Gray -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Format-ColorEX -Text 'a gradient' -Gradient Sunset -GradientSpace OKLCH -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Write-ColorEX -Text 'b1', 'b2', 'b3' -Color DarkRed, '#804000', 94 -Bold -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Format-ColorEX -Text 'b1', 'b2' -Color DarkGreen, @(0, 64, 128) -BackGroundColor DarkBlue -Bold -ColorSupport $s }
+foreach ($s in 'None', 'ANSI4', 'ANSI8', 'TrueColor') { Format-ColorEX -Text 'styled' -Color Cyan -Italic -Underline -UnderlineColor Red -UnderlineStyle Curly -ColorSupport $s }
+Write-ColorEX -Text 'x' -Color @(,@(255, 128, 0)) -TrueColor -ColorSupport ANSI8
+Write-ColorEX -Text 'x' -Color 208 -ANSI8 -ColorSupport ANSI4
+Write-ColorEX -Text 'x' -Color 208 -BackGroundColor 17 -ANSI8 -ColorSupport None
+Write-ColorEX -Text 'x' -Color '#FF8000' -ANSI4 -ColorSupport TrueColor
+$env:NO_COLOR = '1'; Format-ColorEX -Text 'x' -Color Red -ColorSupport ANSI8; Write-ColorEX -Text 'y' -Color '#FF8000' -Bold -ColorSupport TrueColor; $env:NO_COLOR = $null
+$env:FORCE_COLOR = '3'; Format-ColorEX -Text 'x' -Gradient Red, Blue -ColorSupport None; Format-ColorEX -Text 'y' -Color '#FF8000' -ColorSupport ANSI4; Write-ColorEX -Text 'z' -Color Red -ColorSupport None; $env:FORCE_COLOR = $null
+$env:FORCE_COLOR = '0'; Format-ColorEX -Text 'x' -Color '#FF8000' -ColorSupport ANSI8; $env:FORCE_COLOR = $null
+$old = $env:TERM; $env:TERM = 'dumb'; Format-ColorEX -Text 'x' -Color Red -Italic -ColorSupport ANSI4; Write-ColorEX -Text 'y' -Color Red -ColorSupport ANSI4; $env:TERM = $old
+$env:CLICOLOR = '0'; Write-ColorEX -Text 'x' -Color Red -ColorSupport TrueColor; $env:CLICOLOR = $null
+$env:CLICOLOR_FORCE = '1'; Format-ColorEX -Text 'x' -Color Red -Bold -ColorSupport None; $env:CLICOLOR_FORCE = $null
+Write-ColorEX -Text 'x' -Color Red -Bold -ColorSupport ANSI8 -Debugging -Verbose
+Format-ColorEX -Text 'x' -Gradient Red, Blue -ColorSupport ANSI4 -Debugging -Verbose
+Write-ColorEX -Text 'x' -Color Red -ColorSupport None -Debugging -Verbose
+Format-ColorEX -Text '[bold red]x[/] [#FF8000]y[/]' -Markup -ColorSupport ANSI8
+Write-ColorEX -Text 'GET 200 ok' -Highlight @{ '\d+' = 'yellow' } -ColorSupport ANSI4
+foreach ($s in 'None', 'ANSI4') { Format-ColorEX -Text 'site' -Link 'https://example.com' -ColorSupport $s }
+'p1', 'p2' | Format-ColorEX -Color Cyan -ColorSupport ANSI4
+'p1', 'p2' | Write-ColorEX -Color Cyan -Bold -ColorSupport ANSI8
+Write-ColorEX -Text 'styled' -StyleProfile (New-ColorStyle -Name 'cs' -ForegroundColor '#FF8000' -Bold) -ColorSupport ANSI8
+Format-ColorEX -Text 'x' -Color '#FF8000' -ColorSupport truecolor
+Write-ColorEX -Text 'x' -ColorSupport ANSI16
+Format-ColorEX -Text 'x' -ColorSupport ''
+Write-ColorEX -Text 'x' -Colo Red
+(TabExpansion2 -inputScript 'Format-ColorEX -ColorSupport A' -cursorColumn 31).CompletionMatches.CompletionText -join ','
 # Tab completion
 (TabExpansion2 -inputScript 'Write-ColorEX -Color DarkB' -cursorColumn 26).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
 (TabExpansion2 -inputScript 'Write-ColorEX -BackGroundColor ''lightg' -cursorColumn 37).CompletionMatches.CompletionText -join ','
@@ -526,3 +678,84 @@ Register-ColorName Zeta '#123456'; Register-ColorName Alpha Red; (TabExpansion2 
 (TabExpansion2 -inputScript 'Remove-ColorProfile e' -cursorColumn 21).CompletionMatches.CompletionText -join ','
 (TabExpansion2 -inputScript 'Export-ColorProfile x -Name D' -cursorColumn 29).CompletionMatches.CompletionText -join ','
 (TabExpansion2 -inputScript 'Write-ColorEX -Gradient Red, Gre' -cursorColumn 32).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Write-ColorEX -Gradient Sun' -cursorColumn 27).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
+(TabExpansion2 -inputScript 'Write-ColorEX -Gradient ' -cursorColumn 24).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Write-ColorEX -BackGroundGradient I' -cursorColumn 35).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Format-ColorEX -BackGroundGradient ''o' -cursorColumn 37).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'New-ColorStyle -Name x -Gradient F' -cursorColumn 34).CompletionMatches.CompletionText -join ','
+(TabExpansion2 -inputScript 'Import-ColorProfile -Theme Cat' -cursorColumn 30).CompletionMatches | ForEach-Object { $_.CompletionText + ' ' + $_.ToolTip + ' ' + $_.ResultType }
+(TabExpansion2 -inputScript 'Show-ColorTable -Profiles -Name E' -cursorColumn 33).CompletionMatches.CompletionText -join ','
+# Named gradients
+foreach ($g in 'Rainbow', 'Sunset', 'Ocean', 'Forest', 'Fire', 'Ice', 'Neon', 'Pastel', 'Grayscale', 'Atlas', 'Cristal', 'Teen', 'Mind', 'Morning', 'Vice', 'Passion', 'Fruit', 'Instagram', 'Retro', 'Summer', 'Progress') { Write-ColorEX -Text "$g, a named gradient" -Gradient $g }
+foreach ($g in 'Rainbow', 'Sunset', 'Ocean', 'Forest', 'Fire', 'Ice', 'Neon', 'Pastel', 'Grayscale', 'Atlas', 'Cristal', 'Teen', 'Mind', 'Morning', 'Vice', 'Passion', 'Fruit', 'Instagram', 'Retro', 'Summer', 'Progress') { Write-ColorEX -Text "$g, a named gradient" -Gradient $g -ANSI8 }
+Write-ColorEX -Text 'sunset' -Gradient sUNSET
+Write-ColorEX -Text 'sun', 'set' -Gradient Sunset
+Write-ColorEX -Text 'a' -Gradient Retro
+Write-ColorEX -Text 'ab' -Gradient Sunset, Blue
+Write-ColorEX -Text 'x' -Color Sunset
+Write-ColorEX -Text 'ocean' -Color White -BackGroundGradient Ocean
+Write-ColorEX -Text 'fire in 16 colors' -BGGrad fire -ANSI4
+Write-ColorEX -Text 'both' -Gradient Ice -BackGroundGradient Grayscale -GradientSpace RGB
+Write-ColorEX -Text 'a sunset, debugged' -Gradient Sunset -Debugging -Verbose
+Format-ColorEX -Text 'a rainbow as a string' -Gradient Rainbow
+'one line on fire', 'two lines on fire' | Write-ColorEX -Gradient Fire
+Write-ColorEX -Text 'styled' -StyleProfile (New-ColorStyle -Name 'ng' -Gradient Sunset)
+Write-ColorEX -Text 'styled' -StyleProfile (New-ColorStyle -Name 'nbg' -ForegroundColor White -BackgroundGradient Ocean)
+foreach ($g in @('Sunset'), @('sUNSET'), @('Red'), @('NoSuchGradient'), @('sunset', 'Blue')) { Show-Value (New-ColorStyle -Name 'np' -Gradient $g).ToWriteColorParams() }
+Set-ColorDefault -Style (New-ColorStyle -Name 'dg' -Gradient Neon); Write-ColorEX -Text 'a neon default' -Default; [PSColorStyle]::InitializeDefaultProfiles()
+Register-ColorName Ocean '#000080'; Write-ColorEX -Text 'the ocean gradient' -Gradient Ocean; Write-ColorEX -Text 'the Ocean color' -Color Ocean; (TabExpansion2 -inputScript 'Write-ColorEX -Gradient Oc' -cursorColumn 26).CompletionMatches.CompletionText -join ','; Unregister-ColorName Ocean
+# Show-ColorTable views
+Show-ColorTable -Styles
+Show-ColorTable -Palette
+Show-ColorTable -Profiles
+Show-ColorTable -Profiles 'e*', 'W*'
+Show-ColorTable -Profiles NoSuchProfile
+$b = [PSColorStyle]::new('Bare', $null, $null); $b.AddToProfiles(); Show-ColorTable -Profiles Bare; Remove-ColorProfile Bare
+New-ColorStyle -Name 'EverySettingAtOnce' -ForegroundColor @(1, 2, 3) -BackgroundColor 200 -Gradient Red, @(0, 128, 255), '#00FF00' -BackgroundGradient Sunset -GradientSpace RGB -Bold -Faint -Italic -Underline -DoubleUnderline -Blink -Reverse -CrossedOut -Overline -UnderlineColor '#FF0000' -UnderlineStyle Curly -StartTab 1 -StartSpaces 2 -LinesBefore 1 -LinesAfter 1 -AutoPad 30 -PadLeft -PadChar '*' -PadCenter -Truncate -Wrap -ShowTime -NoNewLine -HorizontalCenter -AddToProfiles | Out-Null; Show-ColorTable -Profiles 'Every*'; Remove-ColorProfile EverySettingAtOnce
+$s = New-ColorStyle -Name 'Fractions' -ForegroundColor 5.5 -BackgroundColor @(1.5, 2, 3) -UnderlineColor @(1, 2, 3) -AddToProfiles; $s.Style = 'Bold', 'Curly'; Show-ColorTable -Profiles Fractions, Warning; Remove-ColorProfile Fractions
+$s = New-ColorStyle -Name 'ArrayFraction' -AddToProfiles; $s.ForegroundColor = @(1.5, 2, 3); Show-ColorTable -Profiles ArrayFraction, Warning; $s.ForegroundColor = @(, @(1.5, 2, 3)); Show-ColorTable -Profiles ArrayFraction; Remove-ColorProfile ArrayFraction
+$s = New-ColorStyle -Name 'BadBack' -AddToProfiles; $s.BackgroundColor = @{ a = 1 }; Show-ColorTable -Profiles BadBack, Warning; Remove-ColorProfile BadBack
+$s = New-ColorStyle -Name 'BadUnder' -Underline -AddToProfiles; $s.UnderlineColor = 2.5; Show-ColorTable -Profiles BadUnder, Warning; Remove-ColorProfile BadUnder
+$s = New-ColorStyle -Name 'BadSets' -AddToProfiles; $s.UnderlineStyle = 'Wavy'; Show-ColorTable -Profiles BadSets, Warning; $s.UnderlineStyle = 'curly'; $s.GradientSpace = 'HSV'; Show-ColorTable -Profiles BadSets; $s.GradientSpace = 'rgb'; Show-ColorTable -Profiles BadSets; Remove-ColorProfile BadSets
+$s = New-ColorStyle -Name 'OnlyBack' -AddToProfiles; $s.ForegroundColor = $null; $s.BackgroundColor = 'DarkBlue'; Show-ColorTable -Profiles OnlyBack; Remove-ColorProfile OnlyBack
+Set-ColorDefault; Show-ColorTable -Profiles Default; [PSColorStyle]::InitializeDefaultProfiles()
+$d = [PSColorStyle]::new('Default', $null, $null); $d.AddToProfiles(); $d.SetAsDefault(); Show-ColorTable -Profiles Default; [PSColorStyle]::InitializeDefaultProfiles()
+Show-ColorTable -Styles -Palette
+Show-ColorTable -Background -Profiles
+Show-ColorTable -Palette 'Red'
+# Themes
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme CatppuccinFrappe -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme CatppuccinLatte -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme CatppuccinMacchiato -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme CatppuccinMocha -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme Dracula -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme GruvboxDark -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme GruvboxLight -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme nord -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme OneDark -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme SolarizedDark -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme SolarizedLight -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme TokyoNight -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorSuccess 's'; Write-ColorCritical 'c'; Write-ColorDebug 'd'; Write-ColorEX -Text 'x' -Default; Export-ColorProfile "$TestDir/theme.json" -Name Critical, Debug, Default, Error, Info, Success, Warning; Get-Content "$TestDir/theme.json" -Raw; Remove-Item "$TestDir/theme.json"; Unregister-ColorName $added; [PSColorStyle]::InitializeDefaultProfiles()
+$before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme CSS -PassThru; $t = Get-ColorTableWithRGB; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); [Array]::Sort($added, [StringComparer]::Ordinal); $added.Count; foreach ($n in $added) { $n + ' ' + (Show-Value $t[$n]) }; Show-Value $t['Orange']; Show-Value $t['Gray']; [PSColorStyle]::Default.Name; Write-ColorEX -Text 'a', 'b', 'c' -Color RebeccaPurple, tomato, Grey; Write-ColorEX -Text 'x' -Color SlateGrey -ANSI8; Write-ColorEX -Text 'x' -Color DarkSeaGreen -ANSI4; Write-ColorEX -Text '[aliceblue on midnightblue]css[/]' -Markup; Unregister-ColorName $added
+Register-ColorName Tomato '#000001'; $before = @((Get-ColorTableWithRGB).Keys); Import-ColorProfile -Theme css; $t = Get-ColorTableWithRGB; Show-Value $t['Tomato']; $added = [string[]]@($t.Keys | Where-Object { $before -notcontains $_ }); $added.Count; Unregister-ColorName $added; Unregister-ColorName Tomato
+Import-ColorProfile -Theme PowerShell -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; [PSColorStyle]::Default.Name; Write-ColorError 'e'; Write-ColorWarning 'w'; Write-ColorInfo 'i'; Write-ColorDebug 'd'; Write-ColorCritical 'c'; Write-ColorSuccess 's'; Write-ColorEX -Text 'x' -Default; Show-ColorTable -Profiles Error, Warning, Info, Debug, Critical, Default, Success; [PSColorStyle]::InitializeDefaultProfiles()
+if ($PSStyle) { $e = [char]27; $saved = @{}; foreach ($k in 'Error', 'Warning', 'Verbose', 'Debug', 'ErrorAccent', 'FormatAccent') { $saved[$k] = $PSStyle.Formatting.$k }; try { $PSStyle.Formatting.Error = "$e[1;2;3;5;7;9;53;38;5;200;48;2;10;20;30m"; $PSStyle.Formatting.Warning = "$e[4;58;5;196m$e[38;5;9m"; $PSStyle.Formatting.Verbose = "$e[38;5;300;21;24m"; $PSStyle.Formatting.Debug = "$e[58;5;196;100;99m"; $PSStyle.Formatting.ErrorAccent = ''; $PSStyle.Formatting.FormatAccent = "$e[1m$e[0m$e[96;49;22;23;25;27;29;55;59m"; Import-ColorProfile -Theme PowerShell -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) }; Show-ColorTable -Profiles Error, Warning, Info, Debug, Critical, Default } finally { foreach ($k in $saved.Keys) { $PSStyle.Formatting.$k = $saved[$k] }; [PSColorStyle]::InitializeDefaultProfiles() } }
+$p = $Host.PrivateData; $saved = @{}; foreach ($k in 'ErrorForegroundColor', 'ErrorBackgroundColor', 'WarningForegroundColor', 'VerboseBackgroundColor') { $saved[$k] = $p.$k }; try { $p.ErrorForegroundColor = 'Magenta'; $p.ErrorBackgroundColor = 'DarkBlue'; $p.WarningForegroundColor = 'Cyan'; $p.VerboseBackgroundColor = 'DarkGreen'; Import-ColorProfile -Theme PowerShell -PassThru | ForEach-Object { $_.Name + ' ' + (Show-Value $_.ToWriteColorParams()) } } finally { foreach ($k in $saved.Keys) { $p.$k = $saved[$k] }; [PSColorStyle]::InitializeDefaultProfiles() }
+Import-ColorProfile -Theme NoSuchTheme
+Import-ColorProfile -Theme Nord -Path 'x.json'
+Import-ColorProfile
+# -Style values the binding refuses
+Write-ColorEX -Text 'a b', 'c d' -Gradient Red, Blue -Style 'CrossedOut', $null
+Write-ColorEX -Text 'x' -Style $null
+Write-ColorEX -Text 'x' -Style @()
+Write-ColorEX -Text 'x' -Style 1.5
+Write-ColorEX -Text 'x' -Style @{ a = 1 }
+Write-ColorEX -Text 'x', 'y' -Style 'Bold', 1.5
+Write-ColorEX -Text 'x' -Style ([System.Collections.ArrayList]@('Bold'))
+Write-ColorEX -Text 'x', 'y' -Style @(([System.Collections.ArrayList]@('Bold')), 'Italic')
+Write-ColorEX -Text 'x' -Style 5L
+Write-ColorEX -Text 'x', 'y' -Style ([long[]]@(1, 2))
+Write-ColorEX -Text 'x' -Style ([int[]]@(1, 2))
+Write-ColorEX -Text 'x' -Style @(, @(1.5))
+Format-ColorEX -Text 'x' -Style 'Bold', $null
+'p1', 'p2' | Write-ColorEX -Style 1.5

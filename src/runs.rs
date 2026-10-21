@@ -42,10 +42,14 @@ pub struct Run {
     /// The run's colors converted for the color mode in use.
     pub mode_fg: ColorArg,
     pub mode_bg: ColorArg,
-    /// The run's display characters, and where the run starts in the gradients, which run across
-    /// every character written.
+    /// The run's display characters; where the run starts in the background gradient, which runs
+    /// across every character written; where it starts in the text gradient, which runs across the
+    /// characters that show it; and whether the run's white space shows a text color, under a
+    /// line under, through or over it or -Reverse.
     pub characters: Vec<String>,
     pub gradient_index: usize,
+    pub text_gradient_index: usize,
+    pub shows_space: bool,
 }
 
 impl Run {
@@ -94,23 +98,30 @@ pub fn items_text(items: &[Item]) -> String {
     items.iter().flat_map(|item| item.runs.iter().map(|run| run.text.as_str())).collect()
 }
 
-/// The style a markup word names, and the style it stands for.
+/// The words a markup tag or a -Highlight style takes as styles, each with the style it stands for.
+pub const MARKUP_STYLES: [(&str, &str); 16] = [
+    ("bold", "Bold"),
+    ("faint", "Faint"),
+    ("dim", "Faint"),
+    ("italic", "Italic"),
+    ("underline", "Underline"),
+    ("blink", "Blink"),
+    ("crossedout", "CrossedOut"),
+    ("strike", "CrossedOut"),
+    ("strikethrough", "CrossedOut"),
+    ("doubleunderline", "DoubleUnderline"),
+    ("overline", "Overline"),
+    ("reverse", "Reverse"),
+    ("invert", "Reverse"),
+    ("curly", "Curly"),
+    ("dotted", "Dotted"),
+    ("dashed", "Dashed"),
+];
+
+/// The style a markup word names, compared without regard to case.
 pub fn markup_style(word: &str) -> Option<&'static str> {
-    Some(match word.to_lowercase().as_str() {
-        "bold" => "Bold",
-        "faint" | "dim" => "Faint",
-        "italic" => "Italic",
-        "underline" => "Underline",
-        "blink" => "Blink",
-        "crossedout" | "strike" | "strikethrough" => "CrossedOut",
-        "doubleunderline" => "DoubleUnderline",
-        "overline" => "Overline",
-        "reverse" | "invert" => "Reverse",
-        "curly" => "Curly",
-        "dotted" => "Dotted",
-        "dashed" => "Dashed",
-        _ => return None,
-    })
+    let lower = word.to_lowercase();
+    MARKUP_STYLES.iter().find(|(name, _)| *name == lower).map(|(_, style)| *style)
 }
 
 /// Whether a word of a tag or a -Highlight style is a color: a name in the color table, or a hex
@@ -198,9 +209,9 @@ pub fn parse_spec(text: &str, warn: &mut dyn FnMut(String)) -> Option<Spec> {
     Some(spec)
 }
 
-/// The runs of a string written with markup: [style]text[/], where [/...] closes the tag opened
-/// last, and [[ and ]] write [ and ]. A tag that is not a style, and a closing tag with no tag
-/// open, are written as text, with a warning.
+/// The runs of a string written with markup: `[style]text[/]`, where `[/...]` closes the tag
+/// opened last, and `[[` and `]]` write `[` and `]`. A tag that is not a style, and a closing tag
+/// with no tag open, are written as text, with a warning.
 pub fn parse_markup(text: &str, warn: &mut dyn FnMut(String)) -> Vec<Run> {
     let mut runs: Vec<Run> = Vec::new();
     let mut stack: Vec<Spec> = Vec::new();
@@ -387,7 +398,7 @@ pub fn split_segments(segments: Vec<Segment>, by: SplitBy<'_>) -> Vec<Segment> {
     result
 }
 
-/// The segments with -Highlight's styles over the text its patterns match. `matches` answers the
+/// The segments with -Highlight's styles over the text its patterns match. `matches` returns the
 /// matches of entry `entry` in the line's text as start and end byte offsets. Where matches of
 /// several patterns overlap, the pattern given first wins; an empty match colors nothing.
 pub fn highlight_segments(
@@ -595,7 +606,7 @@ pub enum PadSide {
 /// Wrapped lines each padded to `width` cells, the padding a segment of its own: before the text
 /// with Left, on both sides with Center (the right side one character more when the count is
 /// odd), and after it with Right. A padding segment before the text moves the text's segments one
-/// on, when any line has padding there. Answers the lines and the count of segments with the
+/// on, when any line has padding there. Returns the lines and the count of segments with the
 /// padding segments.
 pub fn pad_lines(lines: Vec<Vec<Item>>, segment_count: usize, width: i64, pad_char: char, pad_width: i64, side: PadSide) -> (Vec<Vec<Item>>, usize) {
     let counts: Vec<(usize, usize)> = lines

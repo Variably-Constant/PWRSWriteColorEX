@@ -3,7 +3,11 @@
 //! PSWriteColorEX, including PowerShell's rounding of halves to even.
 
 use std::collections::HashMap;
-use std::sync::{OnceLock, RwLock};
+use std::sync::Arc;
+
+use subetha_core::swap_cell::SwapCell;
+
+use crate::set_once::SetOnce;
 
 /// One named color in every color mode.
 pub struct Color {
@@ -55,11 +59,11 @@ pub static COLORS: &[Color] = &[
     Color { name: "Coral", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 209, rgb: [255, 127, 80] },
     Color { name: "Crimson", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 160, rgb: [220, 20, 60] },
     Color { name: "Cyan", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 6, rgb: [0, 255, 255] },
-    Color { name: "DarkAmber", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 130, rgb: [255, 160, 0] },
+    Color { name: "DarkAmber", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 214, rgb: [255, 160, 0] },
     Color { name: "DarkAqua", native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 30, rgb: [0, 128, 128] },
-    Color { name: "DarkBlue", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 19, rgb: [0, 0, 139] },
+    Color { name: "DarkBlue", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 18, rgb: [0, 0, 139] },
     Color { name: "DarkBrick", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [139, 26, 26] },
-    Color { name: "DarkBrown", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [101, 67, 33] },
+    Color { name: "DarkBrown", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 239, rgb: [101, 67, 33] },
     Color { name: "DarkChartreuse", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 64, rgb: [69, 139, 0] },
     Color { name: "DarkCoral", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 167, rgb: [205, 91, 69] },
     Color { name: "DarkCrimson", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [139, 0, 0] },
@@ -68,117 +72,117 @@ pub static COLORS: &[Color] = &[
     Color { name: "DarkForest", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 22, rgb: [34, 75, 34] },
     Color { name: "DarkGold", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 136, rgb: [184, 134, 11] },
     Color { name: "DarkGray", native: "DarkGray", ansi4_fg: 90, ansi4_bg: 100, ansi8: 8, rgb: [128, 128, 128] },
-    Color { name: "DarkGreen", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 28, rgb: [0, 100, 0] },
+    Color { name: "DarkGreen", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 22, rgb: [0, 100, 0] },
     Color { name: "DarkIndigo", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 17, rgb: [25, 25, 112] },
     Color { name: "DarkJade", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 22, rgb: [0, 100, 50] },
-    Color { name: "DarkLavender", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 97, rgb: [100, 100, 150] },
-    Color { name: "DarkLime", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 34, rgb: [50, 205, 50] },
-    Color { name: "DarkMagenta", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 53, rgb: [139, 0, 139] },
+    Color { name: "DarkLavender", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 60, rgb: [100, 100, 150] },
+    Color { name: "DarkLime", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 41, rgb: [50, 205, 50] },
+    Color { name: "DarkMagenta", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 90, rgb: [139, 0, 139] },
     Color { name: "DarkMaroon", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 52, rgb: [69, 0, 0] },
-    Color { name: "DarkMint", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 29, rgb: [60, 179, 113] },
+    Color { name: "DarkMint", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 71, rgb: [60, 179, 113] },
     Color { name: "DarkNavy", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 17, rgb: [0, 0, 80] },
     Color { name: "DarkOlive", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 58, rgb: [85, 107, 47] },
-    Color { name: "DarkOrange", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 166, rgb: [255, 140, 0] },
-    Color { name: "DarkPeach", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 172, rgb: [255, 164, 96] },
-    Color { name: "DarkPink", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 163, rgb: [199, 21, 133] },
-    Color { name: "DarkPlum", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 89, rgb: [102, 51, 153] },
+    Color { name: "DarkOrange", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 208, rgb: [255, 140, 0] },
+    Color { name: "DarkPeach", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 215, rgb: [255, 164, 96] },
+    Color { name: "DarkPink", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 162, rgb: [199, 21, 133] },
+    Color { name: "DarkPlum", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 54, rgb: [102, 51, 153] },
     Color { name: "DarkPurple", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 54, rgb: [75, 0, 130] },
-    Color { name: "DarkRed", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 52, rgb: [139, 0, 0] },
-    Color { name: "DarkRose", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 125, rgb: [128, 0, 64] },
-    Color { name: "DarkRuby", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 52, rgb: [155, 17, 30] },
+    Color { name: "DarkRed", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [139, 0, 0] },
+    Color { name: "DarkRose", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 89, rgb: [128, 0, 64] },
+    Color { name: "DarkRuby", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [155, 17, 30] },
     Color { name: "DarkSalmon", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 173, rgb: [233, 150, 122] },
-    Color { name: "DarkSapphire", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 18, rgb: [8, 37, 103] },
-    Color { name: "DarkSky", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 24, rgb: [0, 191, 255] },
+    Color { name: "DarkSapphire", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 17, rgb: [8, 37, 103] },
+    Color { name: "DarkSky", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 39, rgb: [0, 191, 255] },
     Color { name: "DarkSlate", native: "DarkGray", ansi4_fg: 90, ansi4_bg: 100, ansi8: 238, rgb: [47, 79, 79] },
-    Color { name: "DarkSteel", native: "DarkGray", ansi4_fg: 90, ansi4_bg: 100, ansi8: 60, rgb: [70, 70, 70] },
+    Color { name: "DarkSteel", native: "DarkGray", ansi4_fg: 90, ansi4_bg: 100, ansi8: 238, rgb: [70, 70, 70] },
     Color { name: "DarkTan", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 94, rgb: [139, 90, 43] },
-    Color { name: "DarkTeal", native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 23, rgb: [0, 128, 128] },
-    Color { name: "DarkTurquoise", native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 31, rgb: [0, 206, 209] },
-    Color { name: "DarkViolet", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 128, rgb: [148, 0, 211] },
+    Color { name: "DarkTeal", native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 30, rgb: [0, 128, 128] },
+    Color { name: "DarkTurquoise", native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 44, rgb: [0, 206, 209] },
+    Color { name: "DarkViolet", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 92, rgb: [148, 0, 211] },
     Color { name: "DarkWine", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 52, rgb: [72, 0, 25] },
-    Color { name: "DarkYellow", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 136, rgb: [204, 204, 0] },
-    Color { name: "Emerald", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 36, rgb: [80, 200, 120] },
+    Color { name: "DarkYellow", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 184, rgb: [204, 204, 0] },
+    Color { name: "Emerald", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 78, rgb: [80, 200, 120] },
     Color { name: "Forest", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 28, rgb: [34, 139, 34] },
-    Color { name: "Gold", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 178, rgb: [255, 215, 0] },
+    Color { name: "Gold", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 220, rgb: [255, 215, 0] },
     Color { name: "Gray", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 7, rgb: [192, 192, 192] },
     Color { name: "Green", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 2, rgb: [0, 255, 0] },
     Color { name: "Indigo", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 54, rgb: [75, 0, 130] },
     Color { name: "Jade", native: "DarkGreen", ansi4_fg: 32, ansi4_bg: 42, ansi8: 35, rgb: [0, 168, 107] },
-    Color { name: "Lavender", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 183, rgb: [230, 230, 250] },
-    Color { name: "LightAmber", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 221, rgb: [255, 204, 0] },
+    Color { name: "Lavender", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 254, rgb: [230, 230, 250] },
+    Color { name: "LightAmber", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 220, rgb: [255, 204, 0] },
     Color { name: "LightAqua", native: "Cyan", ansi4_fg: 96, ansi4_bg: 106, ansi8: 14, rgb: [127, 255, 255] },
-    Color { name: "LightBlack", native: "DarkGray", ansi4_fg: 90, ansi4_bg: 100, ansi8: 238, rgb: [118, 118, 118] },
+    Color { name: "LightBlack", native: "DarkGray", ansi4_fg: 90, ansi4_bg: 100, ansi8: 243, rgb: [118, 118, 118] },
     Color { name: "LightBlue", native: "Blue", ansi4_fg: 94, ansi4_bg: 104, ansi8: 12, rgb: [85, 85, 255] },
     Color { name: "LightBrick", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 167, rgb: [205, 92, 92] },
-    Color { name: "LightBrown", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 173, rgb: [205, 133, 63] },
-    Color { name: "LightChartreuse", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 154, rgb: [191, 255, 127] },
+    Color { name: "LightBrown", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 172, rgb: [205, 133, 63] },
+    Color { name: "LightChartreuse", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 156, rgb: [191, 255, 127] },
     Color { name: "LightCoral", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 210, rgb: [240, 128, 128] },
-    Color { name: "LightCrimson", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 161, rgb: [248, 48, 88] },
+    Color { name: "LightCrimson", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 197, rgb: [248, 48, 88] },
     Color { name: "LightCyan", native: "Cyan", ansi4_fg: 96, ansi4_bg: 106, ansi8: 14, rgb: [85, 255, 255] },
-    Color { name: "LightEmerald", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 85, rgb: [128, 255, 170] },
-    Color { name: "LightForest", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 34, rgb: [50, 205, 50] },
-    Color { name: "LightGold", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 185, rgb: [255, 223, 0] },
-    Color { name: "LightGray", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 253, rgb: [238, 238, 238] },
+    Color { name: "LightEmerald", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 121, rgb: [128, 255, 170] },
+    Color { name: "LightForest", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 41, rgb: [50, 205, 50] },
+    Color { name: "LightGold", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 220, rgb: [255, 223, 0] },
+    Color { name: "LightGray", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 255, rgb: [238, 238, 238] },
     Color { name: "LightGreen", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 10, rgb: [85, 255, 85] },
-    Color { name: "LightIndigo", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 61, rgb: [102, 102, 153] },
-    Color { name: "LightJade", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 79, rgb: [64, 216, 143] },
-    Color { name: "LightLavender", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 189, rgb: [240, 240, 255] },
-    Color { name: "LightLime", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 119, rgb: [50, 255, 50] },
+    Color { name: "LightIndigo", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 60, rgb: [102, 102, 153] },
+    Color { name: "LightJade", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 78, rgb: [64, 216, 143] },
+    Color { name: "LightLavender", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 255, rgb: [240, 240, 255] },
+    Color { name: "LightLime", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 46, rgb: [50, 255, 50] },
     Color { name: "LightMagenta", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 13, rgb: [255, 85, 255] },
-    Color { name: "LightMaroon", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 124, rgb: [176, 48, 96] },
-    Color { name: "LightMint", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 157, rgb: [189, 252, 201] },
-    Color { name: "LightNavy", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 24, rgb: [0, 0, 205] },
-    Color { name: "LightOlive", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 107, rgb: [170, 170, 0] },
-    Color { name: "LightOrange", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 215, rgb: [255, 195, 0] },
-    Color { name: "LightPeach", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 223, rgb: [255, 239, 213] },
-    Color { name: "LightPink", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 218, rgb: [255, 182, 193] },
-    Color { name: "LightPlum", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 176, rgb: [238, 174, 238] },
-    Color { name: "LightPurple", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 135, rgb: [147, 112, 219] },
+    Color { name: "LightMaroon", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 125, rgb: [176, 48, 96] },
+    Color { name: "LightMint", native: "Green", ansi4_fg: 92, ansi4_bg: 102, ansi8: 158, rgb: [189, 252, 201] },
+    Color { name: "LightNavy", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 20, rgb: [0, 0, 205] },
+    Color { name: "LightOlive", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 142, rgb: [170, 170, 0] },
+    Color { name: "LightOrange", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 214, rgb: [255, 195, 0] },
+    Color { name: "LightPeach", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 230, rgb: [255, 239, 213] },
+    Color { name: "LightPink", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 217, rgb: [255, 182, 193] },
+    Color { name: "LightPlum", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 219, rgb: [238, 174, 238] },
+    Color { name: "LightPurple", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 98, rgb: [147, 112, 219] },
     Color { name: "LightRed", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 9, rgb: [255, 85, 85] },
-    Color { name: "LightRose", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 211, rgb: [255, 182, 193] },
-    Color { name: "LightRuby", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 161, rgb: [255, 102, 153] },
-    Color { name: "LightSalmon", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 175, rgb: [255, 160, 122] },
-    Color { name: "LightSapphire", native: "Blue", ansi4_fg: 94, ansi4_bg: 104, ansi8: 69, rgb: [100, 149, 237] },
-    Color { name: "LightSky", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 152, rgb: [135, 206, 250] },
-    Color { name: "LightSlate", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 103, rgb: [119, 136, 153] },
+    Color { name: "LightRose", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 217, rgb: [255, 182, 193] },
+    Color { name: "LightRuby", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 204, rgb: [255, 102, 153] },
+    Color { name: "LightSalmon", native: "Red", ansi4_fg: 91, ansi4_bg: 101, ansi8: 216, rgb: [255, 160, 122] },
+    Color { name: "LightSapphire", native: "Blue", ansi4_fg: 94, ansi4_bg: 104, ansi8: 68, rgb: [100, 149, 237] },
+    Color { name: "LightSky", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 117, rgb: [135, 206, 250] },
+    Color { name: "LightSlate", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 102, rgb: [119, 136, 153] },
     Color { name: "LightSteel", native: "White", ansi4_fg: 97, ansi4_bg: 47, ansi8: 146, rgb: [176, 196, 222] },
-    Color { name: "LightTan", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 187, rgb: [245, 222, 179] },
-    Color { name: "LightTeal", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 80, rgb: [64, 224, 208] },
-    Color { name: "LightTurquoise", native: "Cyan", ansi4_fg: 96, ansi4_bg: 106, ansi8: 86, rgb: [175, 238, 238] },
-    Color { name: "LightViolet", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 177, rgb: [200, 162, 200] },
-    Color { name: "LightWine", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 125, rgb: [179, 97, 115] },
+    Color { name: "LightTan", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 223, rgb: [245, 222, 179] },
+    Color { name: "LightTeal", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 44, rgb: [64, 224, 208] },
+    Color { name: "LightTurquoise", native: "Cyan", ansi4_fg: 96, ansi4_bg: 106, ansi8: 159, rgb: [175, 238, 238] },
+    Color { name: "LightViolet", native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 182, rgb: [200, 162, 200] },
+    Color { name: "LightWine", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 131, rgb: [179, 97, 115] },
     Color { name: "LightYellow", native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 11, rgb: [255, 255, 85] },
-    Color { name: "Lime", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 118, rgb: [0, 255, 0] },
+    Color { name: "Lime", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 46, rgb: [0, 255, 0] },
     Color { name: "Magenta", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 5, rgb: [255, 0, 255] },
     Color { name: "Maroon", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [128, 0, 0] },
     Color { name: "Mint", native: "Green", ansi4_fg: 32, ansi4_bg: 42, ansi8: 121, rgb: [152, 251, 152] },
     Color { name: "Navy", native: "DarkBlue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 18, rgb: [0, 0, 128] },
     Color { name: "Olive", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 100, rgb: [128, 128, 0] },
-    Color { name: "Orange", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 208, rgb: [255, 165, 0] },
-    Color { name: "Peach", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 216, rgb: [255, 218, 185] },
-    Color { name: "Pink", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 205, rgb: [255, 192, 203] },
-    Color { name: "Plum", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 133, rgb: [221, 160, 221] },
-    Color { name: "Purple", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 93, rgb: [128, 0, 128] },
+    Color { name: "Orange", native: "DarkYellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 214, rgb: [255, 165, 0] },
+    Color { name: "Peach", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 223, rgb: [255, 218, 185] },
+    Color { name: "Pink", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 217, rgb: [255, 192, 203] },
+    Color { name: "Plum", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 182, rgb: [221, 160, 221] },
+    Color { name: "Purple", native: "DarkMagenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 90, rgb: [128, 0, 128] },
     Color { name: "Red", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 1, rgb: [255, 0, 0] },
-    Color { name: "Rose", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 168, rgb: [255, 0, 127] },
-    Color { name: "Ruby", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 124, rgb: [224, 17, 95] },
-    Color { name: "Salmon", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 174, rgb: [250, 128, 114] },
+    Color { name: "Rose", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 198, rgb: [255, 0, 127] },
+    Color { name: "Ruby", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 161, rgb: [224, 17, 95] },
+    Color { name: "Salmon", native: "Red", ansi4_fg: 31, ansi4_bg: 41, ansi8: 210, rgb: [250, 128, 114] },
     Color { name: "Sapphire", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 25, rgb: [15, 82, 186] },
-    Color { name: "Sky", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 111, rgb: [135, 206, 235] },
-    Color { name: "Slate", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 102, rgb: [112, 128, 144] },
-    Color { name: "Steel", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 66, rgb: [113, 121, 126] },
+    Color { name: "Sky", native: "Blue", ansi4_fg: 34, ansi4_bg: 44, ansi8: 117, rgb: [135, 206, 235] },
+    Color { name: "Slate", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 244, rgb: [112, 128, 144] },
+    Color { name: "Steel", native: "Gray", ansi4_fg: 37, ansi4_bg: 47, ansi8: 243, rgb: [113, 121, 126] },
     Color { name: "Tan", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 180, rgb: [210, 180, 140] },
     Color { name: "Teal", native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 30, rgb: [0, 150, 150] },
-    Color { name: "Turquoise", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 43, rgb: [64, 224, 208] },
-    Color { name: "Violet", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 134, rgb: [238, 130, 238] },
+    Color { name: "Turquoise", native: "Cyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 44, rgb: [64, 224, 208] },
+    Color { name: "Violet", native: "Magenta", ansi4_fg: 35, ansi4_bg: 45, ansi8: 213, rgb: [238, 130, 238] },
     Color { name: "White", native: "White", ansi4_fg: 97, ansi4_bg: 107, ansi8: 15, rgb: [255, 255, 255] },
-    Color { name: "Wine", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 88, rgb: [114, 47, 55] },
-    Color { name: "Yellow", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 220, rgb: [255, 255, 0] },
+    Color { name: "Wine", native: "DarkRed", ansi4_fg: 31, ansi4_bg: 41, ansi8: 52, rgb: [114, 47, 55] },
+    Color { name: "Yellow", native: "Yellow", ansi4_fg: 33, ansi4_bg: 43, ansi8: 226, rgb: [255, 255, 0] },
 
 ];
 
 fn index() -> &'static HashMap<String, usize> {
-    static INDEX: OnceLock<HashMap<String, usize>> = OnceLock::new();
+    static INDEX: SetOnce<HashMap<String, usize>> = SetOnce::new();
     INDEX.get_or_init(|| {
         COLORS
             .iter()
@@ -189,35 +193,42 @@ fn index() -> &'static HashMap<String, usize> {
 }
 
 /// The names Register-ColorName added, in the order they were first added, each with its
-/// spelling from then. They last until the module is imported again.
-static REGISTERED: RwLock<Vec<(String, Entry)>> = RwLock::new(Vec::new());
+/// spelling from then. They last until the module is imported again. Any thread reads them
+/// without waiting; a change swaps in a new table, and a replaced one is freed when its last
+/// reader lets go.
+static REGISTERED: SetOnce<SwapCell<Vec<(String, Entry)>>> = SetOnce::new();
+
+fn registered_names() -> &'static SwapCell<Vec<(String, Entry)>> {
+    REGISTERED.get_or_init(|| SwapCell::new(Vec::new()))
+}
 
 /// Adds a name, or replaces the color of a name already registered, which keeps its spelling and
 /// place.
 pub fn register(name: &str, entry: Entry) {
-    let mut registered = REGISTERED.write().unwrap_or_else(|e| e.into_inner());
-    match registered.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
-        Some(found) => found.1 = entry,
-        None => registered.push((name.to_string(), entry)),
-    }
+    registered_names().rcu(|current| {
+        let mut next = current.clone();
+        match next.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
+            Some(found) => found.1 = entry,
+            None => next.push((name.to_string(), entry)),
+        }
+        next
+    });
 }
 
 /// Removes a registered name; false when it was not registered.
 pub fn unregister(name: &str) -> bool {
-    let mut registered = REGISTERED.write().unwrap_or_else(|e| e.into_inner());
-    let before = registered.len();
-    registered.retain(|(n, _)| !n.eq_ignore_ascii_case(name));
-    registered.len() != before
+    let replaced = registered_names().rcu(|current| current.iter().filter(|(n, _)| !n.eq_ignore_ascii_case(name)).cloned().collect());
+    replaced.iter().any(|(n, _)| n.eq_ignore_ascii_case(name))
 }
 
 /// The registered names and their colors, in the order they were added.
 pub fn registered() -> Vec<(String, Entry)> {
-    REGISTERED.read().unwrap_or_else(|e| e.into_inner()).clone()
+    registered_names().load().to_vec()
 }
 
 /// Forgets every registered name, as importing the module again does.
 pub fn clear_registered() {
-    REGISTERED.write().unwrap_or_else(|e| e.into_inner()).clear();
+    registered_names().store(Arc::new(Vec::new()));
 }
 
 /// Every name in the table with its color: the built-in names, a registered name over a built-in
@@ -237,11 +248,8 @@ pub fn table() -> Vec<(String, Entry)> {
 /// The table entry for a color name, registered or built-in, compared without regard to case as
 /// a PowerShell hashtable compares its keys.
 pub fn lookup(name: &str) -> Option<Entry> {
-    {
-        let registered = REGISTERED.read().unwrap_or_else(|e| e.into_inner());
-        if let Some((_, entry)) = registered.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
-            return Some(*entry);
-        }
+    if let Some((_, entry)) = registered_names().load().iter().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
+        return Some(*entry);
     }
     index().get(&name.to_ascii_lowercase()).map(|&i| COLORS[i].entry())
 }
@@ -303,7 +311,7 @@ pub fn ansi4_to_native(code: i64) -> &'static str {
     }
 }
 
-/// PowerShell's rounding: halves go to the even neighbor, as [Math]::Round and an [int] cast do.
+/// PowerShell's rounding: halves go to the even neighbor, as `[Math]::Round` and an `[int]` cast do.
 pub fn round_even(value: f64) -> i64 {
     value.round_ties_even() as i64
 }
@@ -336,34 +344,10 @@ pub fn is_hex_text(text: &str) -> bool {
     text.starts_with('#') || text.get(..2).is_some_and(|prefix| prefix.eq_ignore_ascii_case("0x"))
 }
 
-/// Each channel's step in the 6x6x6 color cube, 0-5.
-fn cube_step(value: i64) -> i64 {
-    match value {
-        v if v < 48 => 0,
-        v if v < 115 => 1,
-        v if v < 155 => 2,
-        v if v < 195 => 3,
-        v if v < 235 => 4,
-        _ => 5,
-    }
-}
-
-/// The nearest 256-color code: one of the 24 grays for a color whose channels are within 10 of
-/// each other, else a code of the 6x6x6 cube. Values outside 0-255 are clamped.
+/// The 256-color code, of the cube and the grays (16-255), that looks nearest to a color, by
+/// OKLab distance. Values outside 0-255 are clamped.
 pub fn rgb_to_ansi8(rgb: [i64; 3]) -> i64 {
-    let [r, g, b] = rgb.map(|v| v.clamp(0, 255));
-    if (r - g).abs() < 10 && (g - b).abs() < 10 {
-        let gray = round_even((r + g + b) as f64 / 3.0);
-        if gray < 8 {
-            return 16;
-        }
-        if gray > 248 {
-            return 231;
-        }
-        let gray_index = round_even((gray - 8) as f64 / 10.0);
-        return 232 + gray_index.min(23);
-    }
-    16 + 36 * cube_step(r) + 6 * cube_step(g) + cube_step(b)
+    crate::oklab::nearest_ansi8(rgb)
 }
 
 /// The nearest 16-color foreground code, 30-37 or 90-97.
@@ -509,7 +493,7 @@ mod tests {
     #[test]
     fn table_has_129_names() {
         assert_eq!(COLORS.len(), 129);
-        assert_eq!(lookup("orange").map(|c| c.ansi8), Some(208));
+        assert_eq!(lookup("orange").map(|c| c.ansi8), Some(214));
         assert_eq!(lookup("RED").map(|c| c.native), Some("Red"));
     }
 
@@ -543,5 +527,46 @@ mod tests {
         assert_eq!(ansi8_to_ansi4(208), 93);
         assert_eq!(ansi8_to_ansi4(0), 30);
         assert_eq!(ansi4_to_native(41), "DarkRed");
+    }
+
+    #[test]
+    fn registered_names_are_added_replaced_removed_and_cleared() {
+        let teal = Entry { native: "DarkCyan", ansi4_fg: 36, ansi4_bg: 46, ansi8: 30, rgb: [0, 128, 128] };
+        let gold = Entry { native: "Yellow", ansi4_fg: 93, ansi4_bg: 103, ansi8: 220, rgb: [255, 215, 0] };
+        register("ZzFirstTestName", teal);
+        register("ZzSecondTestName", gold);
+        assert_eq!(lookup("zzfirsttestname"), Some(teal));
+        register("ZZFIRSTTESTNAME", gold);
+        let mine: Vec<(String, Entry)> =
+            registered().into_iter().filter(|(n, _)| n == "ZzFirstTestName" || n == "ZzSecondTestName").collect();
+        assert_eq!(mine, [("ZzFirstTestName".to_string(), gold), ("ZzSecondTestName".to_string(), gold)]);
+        assert!(unregister("zzsecondtestname"));
+        assert!(!unregister("ZzSecondTestName"));
+        assert_eq!(lookup("ZzSecondTestName"), None);
+        clear_registered();
+        assert_eq!(lookup("ZzFirstTestName"), None);
+        assert_eq!(lookup("Orange").map(|c| c.ansi8), Some(214));
+    }
+
+    #[test]
+    fn lookups_read_the_registered_names_while_they_change() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let magenta = Entry { native: "Magenta", ansi4_fg: 95, ansi4_bg: 105, ansi8: 201, rgb: [255, 0, 255] };
+        let done = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            for _ in 0..4 {
+                scope.spawn(|| {
+                    while !done.load(Ordering::Acquire) {
+                        let found = lookup("ZzChangingTestName");
+                        assert!(found.is_none() || found == Some(magenta));
+                    }
+                });
+            }
+            for _ in 0..500 {
+                register("ZzChangingTestName", magenta);
+                assert!(unregister("ZzChangingTestName") || lookup("ZzChangingTestName").is_none());
+            }
+            done.store(true, Ordering::Release);
+        });
     }
 }

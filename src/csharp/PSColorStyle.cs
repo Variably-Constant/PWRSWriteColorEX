@@ -35,6 +35,11 @@ public class PSColorStyle
     public char PadChar { get; set; }
     public object?[]? BackgroundGradient { get; set; }
     public string? GradientSpace { get; set; }
+    public string? GradientHue { get; set; }
+    public string? GradientEasing { get; set; }
+    public string? GradientRepeat { get; set; }
+    public string? GradientDirection { get; set; }
+    public int GradientSteps { get; set; }
     public bool Reverse { get; set; }
     public object? UnderlineColor { get; set; }
     public string? UnderlineStyle { get; set; }
@@ -73,6 +78,10 @@ public class PSColorStyle
         PadChar = ' ';
         BackgroundGradient = null;
         GradientSpace = string.Empty;
+        GradientHue = string.Empty;
+        GradientEasing = string.Empty;
+        GradientRepeat = string.Empty;
+        GradientDirection = string.Empty;
         UnderlineColor = null;
         UnderlineStyle = string.Empty;
     }
@@ -131,7 +140,7 @@ public class PSColorStyle
         var parameters = new Hashtable(StringComparer.CurrentCultureIgnoreCase);
 
         // A gradient replaces the foreground color
-        if (Gradient != null && Gradient.Length >= 2)
+        if (IsGradient(Gradient))
         {
             parameters["Gradient"] = Gradient;
         }
@@ -140,7 +149,7 @@ public class PSColorStyle
             parameters["Color"] = ForegroundColor;
         }
         // A background gradient replaces the background color
-        if (BackgroundGradient != null && BackgroundGradient.Length >= 2)
+        if (IsGradient(BackgroundGradient))
         {
             parameters["BackGroundGradient"] = BackgroundGradient;
         }
@@ -149,6 +158,11 @@ public class PSColorStyle
             parameters["BackGroundColor"] = BackgroundColor;
         }
         if (!string.IsNullOrEmpty(GradientSpace)) { parameters["GradientSpace"] = GradientSpace; }
+        if (!string.IsNullOrEmpty(GradientHue)) { parameters["GradientHue"] = GradientHue; }
+        if (!string.IsNullOrEmpty(GradientEasing)) { parameters["GradientEasing"] = GradientEasing; }
+        if (!string.IsNullOrEmpty(GradientRepeat)) { parameters["GradientRepeat"] = GradientRepeat; }
+        if (!string.IsNullOrEmpty(GradientDirection)) { parameters["GradientDirection"] = GradientDirection; }
+        if (GradientSteps > 0) { parameters["GradientSteps"] = GradientSteps; }
         if (Style != null && Style.Length > 0) { parameters["Style"] = Style; }
         if (StartTab > 0) { parameters["StartTab"] = StartTab; }
         if (StartSpaces > 0) { parameters["StartSpaces"] = StartSpaces; }
@@ -212,6 +226,11 @@ public class PSColorStyle
         copy.PadChar = PadChar;
         copy.BackgroundGradient = (object?[]?)CopyValue(BackgroundGradient);
         copy.GradientSpace = GradientSpace;
+        copy.GradientHue = GradientHue;
+        copy.GradientEasing = GradientEasing;
+        copy.GradientRepeat = GradientRepeat;
+        copy.GradientDirection = GradientDirection;
+        copy.GradientSteps = GradientSteps;
         copy.Reverse = Reverse;
         copy.UnderlineColor = CopyValue(UnderlineColor);
         copy.UnderlineStyle = UnderlineStyle;
@@ -219,6 +238,30 @@ public class PSColorStyle
         copy.Truncate = Truncate;
         copy.Wrap = Wrap;
         return copy;
+    }
+
+    // The names of the named gradients, as src/gradient.rs lists them
+    private static readonly string[] GradientNames =
+    {
+        "Rainbow", "Sunset", "Ocean", "Forest", "Fire", "Ice", "Neon", "Pastel", "Grayscale", "Atlas",
+        "Cristal", "Teen", "Mind", "Morning", "Vice", "Passion", "Fruit", "Instagram", "Retro", "Summer",
+        "Progress",
+    };
+
+    // Whether a style's gradient is one Write-ColorEX draws: two colors or more, or the name of a
+    // named gradient, compared without regard to case
+    private static bool IsGradient(object?[]? value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+        if (value.Length >= 2)
+        {
+            return true;
+        }
+        var name = value.Length == 1 ? Unwrap(value[0]) as string : null;
+        return name != null && Array.Exists(GradientNames, gradient => string.Equals(gradient, name, StringComparison.OrdinalIgnoreCase));
     }
 
     // A copy of an array, and of the arrays in it such as RGB colors; any other value as it is

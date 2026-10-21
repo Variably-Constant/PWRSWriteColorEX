@@ -1,6 +1,7 @@
 # Builds the module's native library for each of its seven platforms, runs the Pester suites
 # where the runner can load the library, and joins the platforms' module folders into one with
-# `cargo pwrs merge`.
+# `cargo pwrs merge`, adding the help topic and the notices for the colors the themes and named
+# gradients take.
 #
 # Each library is linked for the platform it runs on: win-x64 and win-arm64 on Windows,
 # linux-x64 and linux-arm64 by cargo-zigbuild against glibc 2.35, so they load on any
@@ -28,10 +29,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CARGO_PWRS_VERSION: '0.5.0'
+  CARGO_PWRS_VERSION: '0.7.0'
   PESTER_VERSION: '6.2.0'
-  # PSWriteColorEX 1.2.0, the module this one matches
-  PSWRITECOLOREX_REF: f940803618c92ec3cf5293661becfcd332a3d23c
+  # PSWriteColorEX 1.2.1, the module this one matches
+  PSWRITECOLOREX_REF: 4f63d21245f3403ae52d30c2fd908a09b328d9c1
 
 jobs:
   windows:
@@ -321,6 +322,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo-pwrs
@@ -357,13 +360,32 @@ jobs:
           "runtimes: $($rids -join ', ')"
           if ($rids.Count -ne 7) { throw "The module carries $($rids.Count) platforms, not 7" }
 
+      # cargo pwrs writes the cmdlets' help and the notices for what it compiles; the help topic
+      # and the notices for the colors come from this repository, the notices' sections added
+      # after cargo pwrs's own
+      - name: Add the help topic and the color notices
+        shell: pwsh
+        run: |
+          $module = 'out/PWRSWriteColorEX'
+          New-Item -ItemType Directory -Force "$module/en-US" | Out-Null
+          Copy-Item -LiteralPath 'en-US/about_PWRSWriteColorEX.help.txt' -Destination "$module/en-US/"
+          $colors = [IO.File]::ReadAllText((Resolve-Path 'THIRD-PARTY-NOTICES'))
+          $sections = $colors.Substring($colors.IndexOf("`n=====") + 1)
+          $notices = (Resolve-Path "$module/THIRD-PARTY-NOTICES.txt").Path
+          [IO.File]::AppendAllText($notices, "`n" + $sections, [Text.UTF8Encoding]::new($false))
+          $text = [IO.File]::ReadAllText($notices)
+          foreach ($name in 'gradient-string', 'Catppuccin', 'Solarized', 'Gruvbox', 'Dracula', 'Nord', 'One Dark', 'Tokyo Night', 'CSS named colors') {
+              if (-not $text.Contains("`n$name`n")) { throw "THIRD-PARTY-NOTICES.txt has no entry for $name" }
+          }
+
       - name: Import the joined module
         shell: pwsh
         run: |
           Import-Module ./out/PWRSWriteColorEX/PWRSWriteColorEX.psd1 -ErrorAction Stop
           $commands = @(Get-Command -Module PWRSWriteColorEX -CommandType Cmdlet)
           "$($commands.Count) cmdlets"
-          if ($commands.Count -ne 26) { throw "The module exports $($commands.Count) cmdlets, not 26" }
+          if ($commands.Count -ne 28) { throw "The module exports $($commands.Count) cmdlets, not 28" }
+          if ((Get-Help about_PWRSWriteColorEX | Out-String) -notmatch 'SHORT DESCRIPTION') { throw 'Get-Help finds no about_PWRSWriteColorEX topic' }
           Write-ColorEX -Text 'PWRSWriteColorEX ', 'imports' -Color Cyan, Green
 
       - uses: actions/upload-artifact@v4

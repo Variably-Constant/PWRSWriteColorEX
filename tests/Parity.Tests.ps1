@@ -1,11 +1,12 @@
 # Runs the cases in parity/cases.txt against PSWriteColorEX and against this module, each in a
 # process of its own, under each color environment, and compares every write to the host with its
-# colors, every warning, error and object, and the bytes of every log file. PSWRITECOLOREX names
-# the PSWriteColorEX manifest to compare with. A run without it cannot say whether this module
-# writes what PSWriteColorEX writes, so it fails rather than passing on nothing.
+# colors, every warning, error and object, and the bytes of every log file; then compares the files
+# this module copies from PSWriteColorEX, the theme files and the help topic, with PSWriteColorEX's.
+# PSWRITECOLOREX names the PSWriteColorEX manifest to compare with. A run without it cannot say
+# whether this module writes what PSWriteColorEX writes, so it fails rather than passing on nothing.
 
 BeforeDiscovery {
-    $environments = @(
+    $script:environments = @(
         @{ Name = 'FORCE_COLOR=3 (TrueColor)'; Values = @{ FORCE_COLOR = '3' } }
         @{ Name = 'FORCE_COLOR=2 (ANSI8)'; Values = @{ FORCE_COLOR = '2' } }
         @{ Name = 'FORCE_COLOR=1 (ANSI4)'; Values = @{ FORCE_COLOR = '1' } }
@@ -66,7 +67,7 @@ BeforeAll {
 }
 
 Describe 'Parity with PSWriteColorEX' -Tag 'Parity' {
-    It 'writes what PSWriteColorEX writes with <Name>' -TestCases $environments {
+    It 'writes what PSWriteColorEX writes with <Name>' -TestCases $script:environments {
         $id = ($Name -replace '[^A-Za-z0-9]', '')
         $expected = Invoke-ParityCase -Module PSWriteColorEX -Values $Values -Name "ps-$id"
         $actual = Invoke-ParityCase -Module PWRSWriteColorEX -Values $Values -Name "pwrs-$id"
@@ -83,5 +84,48 @@ Describe 'Parity with PSWriteColorEX' -Tag 'Parity' {
             }
         }
         $differences -join "`n" | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Files copied from PSWriteColorEX' -Tag 'Parity' {
+    BeforeAll {
+        $script:theirRoot = Split-Path -Parent $env:PSWRITECOLOREX
+        $script:ourRoot = Split-Path -Parent $PSScriptRoot
+    }
+
+    It 'has every theme file of PSWriteColorEX, byte for byte' {
+        $theirThemes = Join-Path $script:theirRoot 'Themes'
+        $ourThemes = Join-Path $script:ourRoot 'themes'
+        $theirNames = [string[]]@(Get-ChildItem -LiteralPath $theirThemes -Filter '*.json' -File | ForEach-Object Name)
+        $ourNames = [string[]]@(Get-ChildItem -LiteralPath $ourThemes -Filter '*.json' -File | ForEach-Object Name)
+        [Array]::Sort($theirNames, [StringComparer]::Ordinal)
+        [Array]::Sort($ourNames, [StringComparer]::Ordinal)
+        $theirNames.Count | Should -BeGreaterThan 0
+        $ourNames | Should -Be $theirNames
+        foreach ($name in $theirNames) {
+            [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $ourThemes $name))) |
+                Should -BeExactly ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $theirThemes $name)))) -Because "themes/$name is a copy of PSWriteColorEX's"
+        }
+    }
+
+    It 'has PSWriteColorEX''s help topic under its own name' {
+        $ourPath = Join-Path $script:ourRoot 'en-US/about_PWRSWriteColorEX.help.txt'
+        # The topic's examples hold characters outside ASCII, which Windows PowerShell reads only
+        # after a byte order mark
+        [IO.File]::ReadAllBytes($ourPath)[0..2] | Should -Be @(0xEF, 0xBB, 0xBF)
+        $theirs = [IO.File]::ReadAllText((Join-Path $script:theirRoot 'en-US/about_PSWriteColorEX.help.txt'))
+        $ours = [IO.File]::ReadAllText($ourPath)
+        $marker = "`nLONG DESCRIPTION`n"
+        $theirs.IndexOf($marker) | Should -BeGreaterThan 0
+        $ours.IndexOf($marker) | Should -BeGreaterThan 0
+        # From the long description on, the same text
+        $ours.Substring($ours.IndexOf($marker)) | Should -BeExactly $theirs.Substring($theirs.IndexOf($marker))
+        # Before it, the same words with this module's name, within 80 columns
+        $ourHead = $ours.Substring(0, $ours.IndexOf($marker))
+        $theirHead = $theirs.Substring(0, $theirs.IndexOf($marker)) -creplace 'PSWriteColorEX', 'PWRSWriteColorEX'
+        ($ourHead -split '\s+') -join ' ' | Should -BeExactly (($theirHead -split '\s+') -join ' ')
+        foreach ($line in $ourHead -split "`n") {
+            $line.Length | Should -BeLessOrEqual 80 -Because $line
+        }
     }
 }

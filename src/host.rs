@@ -1,10 +1,13 @@
 //! What the cmdlets need from PowerShell's side: environment variables as the session sees them,
-//! the PowerShell version, and the host, which Write-ColorEX writes to the way Write-Host does.
+//! the PowerShell version, and the host, which Write-ColorEX writes to the way Write-Host does
+//! through PWRS's Pipeline::write_host.
 
 use std::mem::ManuallyDrop;
-use std::sync::OnceLock;
 
 use pwrs::prelude::*;
+use pwrs::{ConsoleColor, ErrorCategory, PsError};
+
+use crate::set_once::SetOnce;
 
 /// An environment variable as the session sees it. PowerShell 7 on Linux and macOS keeps
 /// `$env:` changes in .NET's copy of the environment, out of reach of the C library, so the
@@ -25,7 +28,7 @@ pub fn new_table() -> PsResult<PsHashtable> {
 
 /// The PowerShell major and minor version, read once per session.
 pub fn ps_version(ps: &Pipeline<'_>) -> (i64, i64) {
-    static VERSION: OnceLock<(i64, i64)> = OnceLock::new();
+    static VERSION: SetOnce<(i64, i64)> = SetOnce::new();
     *VERSION.get_or_init(|| {
         let read = || -> PsResult<(i64, i64)> {
             let version = ps.variable("PSVersionTable")?.get("PSVersion")?;
@@ -60,7 +63,7 @@ fn raw_ui(cmdlet: &PsObject) -> Option<PsObject> {
 /// them from the output of a host without virtual terminal support, such as a process with no
 /// console; earlier versions pass them through. Read once per session.
 pub fn host_virtual_terminal(ps: &Pipeline<'_>) -> bool {
-    static VT: OnceLock<bool> = OnceLock::new();
+    static VT: SetOnce<bool> = SetOnce::new();
     *VT.get_or_init(|| {
         if !removes_escape_codes(ps) {
             return true;
@@ -109,105 +112,40 @@ pub fn host_width(ps: &Pipeline<'_>) -> i64 {
     width("BufferSize").max(0)
 }
 
-/// One write to the host, built the way Write-Host builds it: a HostInformationMessage written
-/// to the information stream with the PSHOST tag, with each color left out taken from the host's
-/// current colors, as Write-Host fills them. Windows PowerShell 5.1 records the information
-/// stream in no transcript, so there Write-Host hands its text to the transcript itself, through
-/// the host's TranscribeResult, and so does this. 5.1 keeps that method internal, so it is
-/// reached by reflection.
-pub struct HostWriter {
-    cmdlet: PsObject,
-    message_type: PsType,
-    tags: Option<PsObject>,
-    current: Option<(PsObject, PsObject)>,
-    current_read: bool,
-    transcribes: bool,
-    /// The host's user interface and its TranscribeResult(string), found on the first write in
-    /// Windows PowerShell 5.1.
-    transcript: Option<(PsObject, PsObject)>,
+/// The console colors by the names the color table gives them.
+const CONSOLE_COLORS: [(&str, ConsoleColor); 16] = [
+    ("Black", ConsoleColor::Black),
+    ("DarkBlue", ConsoleColor::DarkBlue),
+    ("DarkGreen", ConsoleColor::DarkGreen),
+    ("DarkCyan", ConsoleColor::DarkCyan),
+    ("DarkRed", ConsoleColor::DarkRed),
+    ("DarkMagenta", ConsoleColor::DarkMagenta),
+    ("DarkYellow", ConsoleColor::DarkYellow),
+    ("Gray", ConsoleColor::Gray),
+    ("DarkGray", ConsoleColor::DarkGray),
+    ("Blue", ConsoleColor::Blue),
+    ("Green", ConsoleColor::Green),
+    ("Cyan", ConsoleColor::Cyan),
+    ("Red", ConsoleColor::Red),
+    ("Magenta", ConsoleColor::Magenta),
+    ("Yellow", ConsoleColor::Yellow),
+    ("White", ConsoleColor::White),
+];
+
+/// The console color a name gives, compared without regard to case as PowerShell converts it.
+fn console_color(name: &str) -> PsResult<ConsoleColor> {
+    CONSOLE_COLORS
+        .iter()
+        .find(|(known, _)| known.eq_ignore_ascii_case(name))
+        .map(|(_, color)| *color)
+        .ok_or_else(|| PsError::new(ErrorCategory::InvalidArgument, "UnknownConsoleColor", format!("'{name}' is not a console color")))
 }
 
-impl HostWriter {
-    pub fn new(ps: &Pipeline<'_>) -> HostWriter {
-        HostWriter {
-            cmdlet: this_cmdlet(ps),
-            message_type: PsType::from_name("System.Management.Automation.HostInformationMessage"),
-            tags: None,
-            current: None,
-            current_read: false,
-            transcribes: ps_version(ps).0 < 6,
-            transcript: None,
-        }
-    }
-
-    /// Hands a write's text to the transcript as Windows PowerShell 5.1's Write-Host does. A host
-    /// without the method records nothing, and a failure here never fails the write.
-    fn transcribe(&mut self, text: &str) {
-        if self.transcript.is_none() {
-            let found = (|| -> PsResult<(PsObject, PsObject)> {
-                let ui = self.cmdlet.get("Host")?.get("UI")?;
-                let string_type = text.into_ps()?.call("GetType", &[])?;
-                let parameter_types = PsArray(vec![string_type]).into_ps()?;
-                // BindingFlags Instance, Public and NonPublic
-                let flags = (4i32 | 16 | 32).into_ps()?;
-                let method = ui
-                    .call("GetType", &[])?
-                    .call("GetMethod", &["TranscribeResult".into_ps()?, flags, PsObject::null(), parameter_types, PsObject::null()])?;
-                Ok((ui, method))
-            })();
-            self.transcript = Some(found.unwrap_or_else(|_| (PsObject::null(), PsObject::null())));
-        }
-        if let Some((ui, method)) = &self.transcript
-            && !method.is_null()
-            && let Ok(text) = text.into_ps()
-            && let Ok(arguments) = PsArray(vec![text]).into_ps()
-        {
-            let _ = method.call("Invoke", &[ui.clone(), arguments]);
-        }
-    }
-
-    /// The host's current foreground and background colors, read once per writer.
-    fn current_colors(&mut self) -> Option<(PsObject, PsObject)> {
-        if !self.current_read {
-            self.current_read = true;
-            self.current = raw_ui(&self.cmdlet).and_then(|raw| {
-                let fg = raw.get("ForegroundColor").ok()?;
-                let bg = raw.get("BackgroundColor").ok()?;
-                Some((fg, bg))
-            });
-        }
-        self.current.clone()
-    }
-
-    pub fn write(&mut self, text: &str, fg: Option<&str>, bg: Option<&str>, no_newline: bool) -> PsResult<()> {
-        let message = self.message_type.new(&[])?;
-        message.set("Message", &text.into_ps()?)?;
-        message.set("NoNewLine", &no_newline.into_ps()?)?;
-        let current = self.current_colors();
-        match fg {
-            Some(color) => message.set("ForegroundColor", &color.into_ps()?)?,
-            None => {
-                if let Some((current_fg, _)) = &current {
-                    message.set("ForegroundColor", current_fg)?;
-                }
-            }
-        }
-        match bg {
-            Some(color) => message.set("BackgroundColor", &color.into_ps()?)?,
-            None => {
-                if let Some((_, current_bg)) = &current {
-                    message.set("BackgroundColor", current_bg)?;
-                }
-            }
-        }
-        if self.tags.is_none() {
-            self.tags = Some(vec!["PSHOST".to_string()].into_ps()?);
-        }
-        let tags = self.tags.clone().unwrap_or_default();
-        self.cmdlet.call("WriteInformation", &[message, tags])?;
-        if self.transcribes {
-            self.transcribe(text);
-        }
-        Ok(())
-    }
+/// Writes to the host as Write-Host does: PWRS hands the text to the information stream with the
+/// PSHOST tag, takes each color left out from the host's current colors, and in Windows
+/// PowerShell 5.1 records the write in the transcript.
+pub fn write_host(ps: &Pipeline<'_>, text: &str, fg: Option<&str>, bg: Option<&str>, no_newline: bool) -> PsResult<()> {
+    let foreground = fg.map(console_color).transpose()?;
+    let background = bg.map(console_color).transpose()?;
+    ps.write_host(text, foreground, background, no_newline)
 }

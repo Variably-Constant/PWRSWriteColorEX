@@ -180,7 +180,8 @@ pub struct NewColorStyle {
     /// The background color, in the same forms as -ForegroundColor.
     #[param(position = 2)]
     pub background_color: Option<PsObject>,
-    /// Two or more colors to blend across the text, in place of -ForegroundColor.
+    /// Two or more colors to blend across the text, or the name of a named gradient, such as
+    /// Sunset, in place of -ForegroundColor.
     #[param(position = 3)]
     pub gradient: Option<Vec<PsObject>>,
     /// Bold text.
@@ -237,13 +238,37 @@ pub struct NewColorStyle {
     /// The character to pad with.
     #[param(position = 9)]
     pub pad_char: Option<char>,
-    /// Two or more colors to blend across the background. It replaces -BackgroundColor.
+    /// Two or more colors to blend across the background, or the name of a named gradient. It
+    /// replaces -BackgroundColor.
     #[param(position = 10)]
     pub background_gradient: Option<Vec<PsObject>>,
-    /// How the gradients blend their colors: OKLab or RGB. Without it, Write-ColorEX's default,
-    /// OKLab.
-    #[param(position = 11, validate_set = ["OKLab", "RGB"])]
+    /// How the gradients blend their colors: OKLab, RGB, LinearRGB, OKLCH, HSL, HSV, Lab or LCh, as
+    /// Write-ColorEX's -GradientSpace takes them. Without it, Write-ColorEX's default, OKLab.
+    #[param(position = 11, validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"])]
     pub gradient_space: Option<String>,
+    /// The way round the hue wheel in OKLCH, HSL, HSV and LCh: Shorter, Longer, Increasing or
+    /// Decreasing. Without it, Write-ColorEX's default, Shorter.
+    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"])]
+    pub gradient_hue: Option<String>,
+    /// A curve that moves the colors along the text, as Write-ColorEX's -GradientEasing takes it.
+    /// Without it, Write-ColorEX's default, Linear.
+    #[param(validate_set = [
+        "Linear", "InSine", "OutSine", "InOutSine", "InQuad", "OutQuad", "InOutQuad", "InCubic", "OutCubic", "InOutCubic", "InQuart", "OutQuart",
+        "InOutQuart", "InQuint", "OutQuint", "InOutQuint", "InExpo", "OutExpo", "InOutExpo", "InCirc", "OutCirc", "InOutCirc", "InBack", "OutBack",
+        "InOutBack", "InElastic", "OutElastic", "InOutElastic", "InBounce", "OutBounce", "InOutBounce"
+    ])]
+    pub gradient_easing: Option<String>,
+    /// What the gradients do past placed first and last colors: None, Repeat or Mirror. Without
+    /// it, Write-ColorEX's default, None.
+    #[param(validate_set = ["None", "Repeat", "Mirror"])]
+    pub gradient_repeat: Option<String>,
+    /// The way the gradients run across the text: Forward, Reverse, CenterOut or EdgesIn. Without
+    /// it, Write-ColorEX's default, Forward.
+    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"])]
+    pub gradient_direction: Option<String>,
+    /// Cuts the gradients into this many bands of solid color. 0 blends smoothly.
+    #[param(validate_range(0, 2147483647))]
+    pub gradient_steps: i32,
     /// Swaps the text and background colors.
     #[param]
     pub reverse: bool,
@@ -290,6 +315,11 @@ impl Cmdlet for NewColorStyle {
         };
         style.set("BackgroundGradient", &background_gradient)?;
         style.set("GradientSpace", &self.gradient_space.clone().unwrap_or_default().into_ps()?)?;
+        style.set("GradientHue", &self.gradient_hue.clone().unwrap_or_default().into_ps()?)?;
+        style.set("GradientEasing", &self.gradient_easing.clone().unwrap_or_default().into_ps()?)?;
+        style.set("GradientRepeat", &self.gradient_repeat.clone().unwrap_or_default().into_ps()?)?;
+        style.set("GradientDirection", &self.gradient_direction.clone().unwrap_or_default().into_ps()?)?;
+        style.set("GradientSteps", &self.gradient_steps.into_ps()?)?;
         style.set("UnderlineColor", &self.underline_color.clone().unwrap_or_default())?;
         style.set("UnderlineStyle", &self.underline_style.clone().unwrap_or_default().into_ps()?)?;
         for (property, on) in [

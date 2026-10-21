@@ -1,15 +1,15 @@
-# The commands, parameters, aliases and the PSColorStyle class match PSWriteColorEX 1.2.0's, so a
-# script written for one module runs with the other. The expected text is what PSWriteColorEX
-# 1.2.0 itself answers to the same functions.
+# The commands, parameters, aliases, output types and the PSColorStyle class match PSWriteColorEX's,
+# so a script written for one module runs with the other. The expected text is what the same
+# functions write for PSWriteColorEX itself.
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'Common.ps1')
     Import-PWRSWriteColorEX
 
-    # The commands of a module as text: each command with its aliases and parameter sets, and each
-    # parameter with its type, position, whether it is mandatory or takes pipeline input, its
-    # aliases, its valid values and range, and its parameter sets. Names sort ordinally, so every
-    # host and culture writes the same text.
+    # The commands of a module as text: each command with its aliases, parameter sets and output
+    # types, and each parameter with its type, position, whether it is mandatory or takes pipeline
+    # input, its aliases, its valid values and range, and its parameter sets. Names sort ordinally,
+    # so every host and culture writes the same text.
     function Get-CommandSurface {
         param([Parameter(Mandatory)][string]$Module)
         $ordinal = { param([string[]]$Items) if (-not $Items) { return @() }; $sorted = [string[]]$Items.Clone(); [Array]::Sort($sorted, [StringComparer]::Ordinal); $sorted }
@@ -20,7 +20,8 @@ BeforeAll {
             $command = $commands | Where-Object Name -EQ $name
             $aliases = & $ordinal @(Get-Alias | Where-Object { $_.ResolvedCommandName -eq $name } | ForEach-Object Name)
             $sets = & $ordinal @($command.ParameterSets | ForEach-Object { $_.Name + $(if ($_.IsDefault) { '*' } else { '' }) })
-            "$name aliases=[$($aliases -join ',')] sets=[$($sets -join ',')]"
+            $outputs = & $ordinal @($command.OutputType | ForEach-Object Name)
+            "$name aliases=[$($aliases -join ',')] sets=[$($sets -join ',')] outputs=[$($outputs -join ',')]"
             foreach ($parameter in $command.Parameters.Values) {
                 if ($common -contains $parameter.Name) { continue }
                 $attributes = @($parameter.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] })
@@ -47,28 +48,34 @@ BeforeAll {
     }
 }
 
-Describe 'The surface of PSWriteColorEX 1.2.0' -Tag 'Surface' {
-    It 'has the same commands, parameters and aliases' {
+Describe 'The surface of PSWriteColorEX' -Tag 'Surface' {
+    It 'has the same commands, parameters, aliases and output types' {
         $expected = @'
-Convert-HexToRGB aliases=[CHR,Hex2RGB] sets=[__AllParameterSets]
+Convert-HexToRGB aliases=[CHR,Hex2RGB] sets=[__AllParameterSets] outputs=[System.Int32]
   Hex type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Convert-RGBToANSI4 aliases=[CRA4,RGB2ANSI4] sets=[__AllParameterSets]
+Convert-RGBToANSI4 aliases=[CRA4,RGB2ANSI4] sets=[__AllParameterSets] outputs=[System.Int32]
   RGB type=Int32[] position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Convert-RGBToANSI8 aliases=[CRA8,RGB2ANSI8] sets=[__AllParameterSets]
+Convert-RGBToANSI8 aliases=[CRA8,RGB2ANSI8] sets=[__AllParameterSets] outputs=[System.Int32]
   RGB type=Int32[] position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Export-ColorProfile aliases=[Export-ColourProfile] sets=[__AllParameterSets]
+Export-ColorProfile aliases=[Export-ColourProfile] sets=[__AllParameterSets] outputs=[]
   Path type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Name type=String[] position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Format-ColorEX aliases=[FCEX,Format-ColourEX] sets=[__AllParameterSets]
+Format-ColorEX aliases=[FCEX,Format-ColourEX] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[T] values=[] range=[] sets=[__AllParameterSets]
   Color type=Array position=1 mandatory=False pipeline=False aliases=[C,FGC,ForegroundColor] values=[] range=[] sets=[__AllParameterSets]
   BackGroundColor type=Array position=2 mandatory=False pipeline=False aliases=[B,BGC] values=[] range=[] sets=[__AllParameterSets]
   Gradient type=Object[] position=- mandatory=False pipeline=False aliases=[Grad] values=[] range=[] sets=[__AllParameterSets]
   BackGroundGradient type=Object[] position=- mandatory=False pipeline=False aliases=[BGGrad] values=[] range=[] sets=[__AllParameterSets]
-  GradientSpace type=String position=- mandatory=False pipeline=False aliases=[] values=[OKLab|RGB] range=[] sets=[__AllParameterSets]
+  GradientSpace type=String position=- mandatory=False pipeline=False aliases=[] values=[OKLab|RGB|LinearRGB|OKLCH|HSL|HSV|Lab|LCh] range=[] sets=[__AllParameterSets]
+  GradientHue type=String position=- mandatory=False pipeline=False aliases=[] values=[Shorter|Longer|Increasing|Decreasing] range=[] sets=[__AllParameterSets]
+  GradientEasing type=String position=- mandatory=False pipeline=False aliases=[] values=[Linear|InSine|OutSine|InOutSine|InQuad|OutQuad|InOutQuad|InCubic|OutCubic|InOutCubic|InQuart|OutQuart|InOutQuart|InQuint|OutQuint|InOutQuint|InExpo|OutExpo|InOutExpo|InCirc|OutCirc|InOutCirc|InBack|OutBack|InOutBack|InElastic|OutElastic|InOutElastic|InBounce|OutBounce|InOutBounce] range=[] sets=[__AllParameterSets]
+  GradientRepeat type=String position=- mandatory=False pipeline=False aliases=[] values=[None|Repeat|Mirror] range=[] sets=[__AllParameterSets]
+  GradientDirection type=String position=- mandatory=False pipeline=False aliases=[] values=[Forward|Reverse|CenterOut|EdgesIn] range=[] sets=[__AllParameterSets]
+  GradientSteps type=Int32 position=- mandatory=False pipeline=False aliases=[] values=[] range=[0..2147483647] sets=[__AllParameterSets]
   ANSI4 type=SwitchParameter position=- mandatory=False pipeline=False aliases=[A4] values=[] range=[] sets=[__AllParameterSets]
   ANSI8 type=SwitchParameter position=- mandatory=False pipeline=False aliases=[A8] values=[] range=[] sets=[__AllParameterSets]
   ANSI24 type=SwitchParameter position=- mandatory=False pipeline=False aliases=[A24,TC,TrueColor] values=[] range=[] sets=[__AllParameterSets]
+  ColorSupport type=String position=- mandatory=False pipeline=False aliases=[] values=[None|ANSI4|ANSI8|TrueColor] range=[] sets=[__AllParameterSets]
   Style type=Object position=- mandatory=False pipeline=False aliases=[S] values=[] range=[] sets=[__AllParameterSets]
   StyleProfile type=PSColorStyle position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Default type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
@@ -99,24 +106,38 @@ Format-ColorEX aliases=[FCEX,Format-ColourEX] sets=[__AllParameterSets]
   Wrap type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Debugging type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Silent type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Get-ColorProfiles aliases=[GCP,Get-ColourProfiles,Get-Profiles,gcprofiles] sets=[__AllParameterSets]
+Get-ColorContrast aliases=[Get-ColourContrast] sets=[__AllParameterSets] outputs=[System.Double]
+  Color type=Object position=0 mandatory=True pipeline=False aliases=[C,FGC,ForegroundColor] values=[] range=[] sets=[__AllParameterSets]
+  BackGroundColor type=Object position=1 mandatory=True pipeline=False aliases=[B,BGC] values=[] range=[] sets=[__AllParameterSets]
+Get-ColorProfiles aliases=[GCP,Get-ColourProfiles,Get-Profiles,gcprofiles] sets=[__AllParameterSets] outputs=[PSColorStyle]
   Name type=String position=0 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Get-ColorTableWithRGB aliases=[GCT,Get-ColorTable,Get-ColourTable] sets=[__AllParameterSets]
-Get-LighterANSI8Color aliases=[LA8,Lighten-ANSI8,Lighten-ANSI8Color] sets=[__AllParameterSets]
+Get-ColorTableWithRGB aliases=[GCT,Get-ColorTable,Get-ColourTable] sets=[__AllParameterSets] outputs=[System.Collections.Hashtable]
+Get-GradientColor aliases=[Get-GradientColour] sets=[Count*,Place] outputs=[System.Int32[]]
+  Gradient type=Object[] position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
+  Count type=Int32 position=- mandatory=True pipeline=False aliases=[] values=[] range=[1..2147483647] sets=[Count]
+  Place type=Double[] position=- mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[Place]
+  GradientSpace type=String position=- mandatory=False pipeline=False aliases=[] values=[OKLab|RGB|LinearRGB|OKLCH|HSL|HSV|Lab|LCh] range=[] sets=[__AllParameterSets]
+  GradientHue type=String position=- mandatory=False pipeline=False aliases=[] values=[Shorter|Longer|Increasing|Decreasing] range=[] sets=[__AllParameterSets]
+  GradientEasing type=String position=- mandatory=False pipeline=False aliases=[] values=[Linear|InSine|OutSine|InOutSine|InQuad|OutQuad|InOutQuad|InCubic|OutCubic|InOutCubic|InQuart|OutQuart|InOutQuart|InQuint|OutQuint|InOutQuint|InExpo|OutExpo|InOutExpo|InCirc|OutCirc|InOutCirc|InBack|OutBack|InOutBack|InElastic|OutElastic|InOutElastic|InBounce|OutBounce|InOutBounce] range=[] sets=[__AllParameterSets]
+  GradientRepeat type=String position=- mandatory=False pipeline=False aliases=[] values=[None|Repeat|Mirror] range=[] sets=[__AllParameterSets]
+  GradientDirection type=String position=- mandatory=False pipeline=False aliases=[] values=[Forward|Reverse|CenterOut|EdgesIn] range=[] sets=[__AllParameterSets]
+  GradientSteps type=Int32 position=- mandatory=False pipeline=False aliases=[] values=[] range=[0..2147483647] sets=[__AllParameterSets]
+Get-LighterANSI8Color aliases=[LA8,Lighten-ANSI8,Lighten-ANSI8Color] sets=[__AllParameterSets] outputs=[System.Int32]
   ANSI8Code type=Int32 position=0 mandatory=True pipeline=False aliases=[] values=[] range=[0..255] sets=[__AllParameterSets]
   Factor type=Double position=1 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Get-LighterColorName aliases=[Lighten-ColorName] sets=[__AllParameterSets]
+Get-LighterColorName aliases=[Lighten-ColorName] sets=[__AllParameterSets] outputs=[System.String]
   ColorName type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Get-LighterRGBColor aliases=[Lighten-RGBColor] sets=[__AllParameterSets]
+Get-LighterRGBColor aliases=[Lighten-RGBColor] sets=[__AllParameterSets] outputs=[System.Int32]
   RGB type=Int32[] position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Factor type=Double position=1 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Import-ColorProfile aliases=[Import-ColourProfile] sets=[__AllParameterSets]
-  Path type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
+Import-ColorProfile aliases=[Import-ColourProfile] sets=[Path*,Theme] outputs=[PSColorStyle]
+  Path type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[Path]
+  Theme type=String position=- mandatory=True pipeline=False aliases=[] values=[CatppuccinFrappe|CatppuccinLatte|CatppuccinMacchiato|CatppuccinMocha|CSS|Dracula|GruvboxDark|GruvboxLight|Nord|OneDark|PowerShell|SolarizedDark|SolarizedLight|TokyoNight] range=[] sets=[Theme]
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Measure-DisplayWidth aliases=[Get-DisplayWidth,MDW] sets=[__AllParameterSets]
+Measure-DisplayWidth aliases=[Get-DisplayWidth,MDW] sets=[__AllParameterSets] outputs=[System.Int32]
   Text type=String position=0 mandatory=True pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   AmbiguousAsWide type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-New-ColorStyle aliases=[NCS,New-ColourStyle,New-Style,ncstyle] sets=[__AllParameterSets]
+New-ColorStyle aliases=[NCS,New-ColourStyle,New-Style,ncstyle] sets=[__AllParameterSets] outputs=[PSColorStyle]
   Name type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   ForegroundColor type=Object position=1 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   BackgroundColor type=Object position=2 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
@@ -140,7 +161,12 @@ New-ColorStyle aliases=[NCS,New-ColourStyle,New-Style,ncstyle] sets=[__AllParame
   PadLeft type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PadChar type=Char position=9 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   BackgroundGradient type=Object[] position=10 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-  GradientSpace type=String position=11 mandatory=False pipeline=False aliases=[] values=[OKLab|RGB] range=[] sets=[__AllParameterSets]
+  GradientSpace type=String position=11 mandatory=False pipeline=False aliases=[] values=[OKLab|RGB|LinearRGB|OKLCH|HSL|HSV|Lab|LCh] range=[] sets=[__AllParameterSets]
+  GradientHue type=String position=- mandatory=False pipeline=False aliases=[] values=[Shorter|Longer|Increasing|Decreasing] range=[] sets=[__AllParameterSets]
+  GradientEasing type=String position=- mandatory=False pipeline=False aliases=[] values=[Linear|InSine|OutSine|InOutSine|InQuad|OutQuad|InOutQuad|InCubic|OutCubic|InOutCubic|InQuart|OutQuart|InOutQuart|InQuint|OutQuint|InOutQuint|InExpo|OutExpo|InOutExpo|InCirc|OutCirc|InOutCirc|InBack|OutBack|InOutBack|InElastic|OutElastic|InOutElastic|InBounce|OutBounce|InOutBounce] range=[] sets=[__AllParameterSets]
+  GradientRepeat type=String position=- mandatory=False pipeline=False aliases=[] values=[None|Repeat|Mirror] range=[] sets=[__AllParameterSets]
+  GradientDirection type=String position=- mandatory=False pipeline=False aliases=[] values=[Forward|Reverse|CenterOut|EdgesIn] range=[] sets=[__AllParameterSets]
+  GradientSteps type=Int32 position=- mandatory=False pipeline=False aliases=[] values=[] range=[0..2147483647] sets=[__AllParameterSets]
   Reverse type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   UnderlineColor type=Object position=12 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   UnderlineStyle type=String position=13 mandatory=False pipeline=False aliases=[] values=[Single|Double|Curly|Dotted|Dashed] range=[] sets=[__AllParameterSets]
@@ -149,13 +175,13 @@ New-ColorStyle aliases=[NCS,New-ColourStyle,New-Style,ncstyle] sets=[__AllParame
   Wrap type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   AddToProfiles type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   SetAsDefault type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Register-ColorName aliases=[Register-ColourName] sets=[__AllParameterSets]
+Register-ColorName aliases=[Register-ColourName] sets=[__AllParameterSets] outputs=[]
   Name type=String position=0 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Color type=Object position=1 mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Force type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Remove-ColorProfile aliases=[Remove-ColourProfile] sets=[__AllParameterSets]
+Remove-ColorProfile aliases=[Remove-ColourProfile] sets=[__AllParameterSets] outputs=[]
   Name type=String[] position=0 mandatory=True pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Set-ColorDefault aliases=[SCD,Set-ColourDefault,Set-DefaultColor,Set-DefaultColour] sets=[Object,Properties*]
+Set-ColorDefault aliases=[SCD,Set-ColourDefault,Set-DefaultColor,Set-DefaultColour] sets=[Object,Properties*] outputs=[]
   Style type=PSColorStyle position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Object]
   ForegroundColor type=Object position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Properties]
   BackgroundColor type=Object position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Properties]
@@ -165,26 +191,29 @@ Set-ColorDefault aliases=[SCD,Set-ColourDefault,Set-DefaultColor,Set-DefaultColo
   ShowTime type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Properties]
   StartTab type=Int32 position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Properties]
   StartSpaces type=Int32 position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Properties]
-Show-ColorTable aliases=[Show-ColourTable] sets=[__AllParameterSets]
-  Name type=String[] position=0 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-  Background type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Test-AnsiSupport aliases=[TAS,Test-ANSI] sets=[__AllParameterSets]
+Show-ColorTable aliases=[Show-ColourTable] sets=[Names*,Palette,Profiles,Styles] outputs=[]
+  Name type=String[] position=0 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Names/Profiles]
+  Background type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[Names]
+  Styles type=SwitchParameter position=- mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[Styles]
+  Palette type=SwitchParameter position=- mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[Palette]
+  Profiles type=SwitchParameter position=- mandatory=True pipeline=False aliases=[] values=[] range=[] sets=[Profiles]
+Test-AnsiSupport aliases=[TAS,Test-ANSI] sets=[__AllParameterSets] outputs=[System.Management.Automation.PSCustomObject]
   Silent type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Unregister-ColorName aliases=[Unregister-ColourName] sets=[__AllParameterSets]
+Unregister-ColorName aliases=[Unregister-ColourName] sets=[__AllParameterSets] outputs=[]
   Name type=String[] position=0 mandatory=True pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorCritical aliases=[WCC,WCritical,Write-ColourCritical,Write-CriticalColor,Write-CriticalColour,wccritical] sets=[__AllParameterSets]
+Write-ColorCritical aliases=[WCC,WCritical,Write-ColourCritical,Write-CriticalColor,Write-CriticalColour,wccritical] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoNewLine type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   LogFile type=String position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoConsoleOutput type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorDebug aliases=[WCD,WDebug,Write-ColourDebug,Write-DebugColor,Write-DebugColour,wcdebug] sets=[__AllParameterSets]
+Write-ColorDebug aliases=[WCD,WDebug,Write-ColourDebug,Write-DebugColor,Write-DebugColour,wcdebug] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoNewLine type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   LogFile type=String position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoConsoleOutput type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorEX aliases=[WC,WCEX,Write-Color,Write-Colour,Write-ColourEX,wcolor,wcolour] sets=[__AllParameterSets]
+Write-ColorEX aliases=[WC,WCEX,Write-Color,Write-Colour,Write-ColourEX,wcolor,wcolour] sets=[__AllParameterSets] outputs=[]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[T] values=[] range=[] sets=[__AllParameterSets]
   Color type=Array position=1 mandatory=False pipeline=False aliases=[C,FGC,ForegroundColor] values=[] range=[] sets=[__AllParameterSets]
   BackGroundColor type=Array position=2 mandatory=False pipeline=False aliases=[B,BGC] values=[] range=[] sets=[__AllParameterSets]
@@ -192,6 +221,7 @@ Write-ColorEX aliases=[WC,WCEX,Write-Color,Write-Colour,Write-ColourEX,wcolor,wc
   ANSI4 type=SwitchParameter position=- mandatory=False pipeline=False aliases=[A4] values=[] range=[] sets=[__AllParameterSets]
   ANSI8 type=SwitchParameter position=- mandatory=False pipeline=False aliases=[A8] values=[] range=[] sets=[__AllParameterSets]
   ANSI24 type=SwitchParameter position=- mandatory=False pipeline=False aliases=[A24,TC,TrueColor] values=[] range=[] sets=[__AllParameterSets]
+  ColorSupport type=String position=- mandatory=False pipeline=False aliases=[] values=[None|ANSI4|ANSI8|TrueColor] range=[] sets=[__AllParameterSets]
   Style type=Object position=4 mandatory=False pipeline=False aliases=[S] values=[] range=[] sets=[__AllParameterSets]
   StyleProfile type=PSColorStyle position=5 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Default type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
@@ -232,31 +262,36 @@ Write-ColorEX aliases=[WC,WCEX,Write-Color,Write-Colour,Write-ColourEX,wcolor,wc
   Link type=String[] position=21 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Reverse type=SwitchParameter position=- mandatory=False pipeline=False aliases=[Invert] values=[] range=[] sets=[__AllParameterSets]
   BackGroundGradient type=Object[] position=22 mandatory=False pipeline=False aliases=[BGGrad] values=[] range=[] sets=[__AllParameterSets]
-  GradientSpace type=String position=23 mandatory=False pipeline=False aliases=[] values=[OKLab|RGB] range=[] sets=[__AllParameterSets]
+  GradientSpace type=String position=23 mandatory=False pipeline=False aliases=[] values=[OKLab|RGB|LinearRGB|OKLCH|HSL|HSV|Lab|LCh] range=[] sets=[__AllParameterSets]
+  GradientHue type=String position=- mandatory=False pipeline=False aliases=[] values=[Shorter|Longer|Increasing|Decreasing] range=[] sets=[__AllParameterSets]
+  GradientEasing type=String position=- mandatory=False pipeline=False aliases=[] values=[Linear|InSine|OutSine|InOutSine|InQuad|OutQuad|InOutQuad|InCubic|OutCubic|InOutCubic|InQuart|OutQuart|InOutQuart|InQuint|OutQuint|InOutQuint|InExpo|OutExpo|InOutExpo|InCirc|OutCirc|InOutCirc|InBack|OutBack|InOutBack|InElastic|OutElastic|InOutElastic|InBounce|OutBounce|InOutBounce] range=[] sets=[__AllParameterSets]
+  GradientRepeat type=String position=- mandatory=False pipeline=False aliases=[] values=[None|Repeat|Mirror] range=[] sets=[__AllParameterSets]
+  GradientDirection type=String position=- mandatory=False pipeline=False aliases=[] values=[Forward|Reverse|CenterOut|EdgesIn] range=[] sets=[__AllParameterSets]
+  GradientSteps type=Int32 position=- mandatory=False pipeline=False aliases=[] values=[] range=[0..2147483647] sets=[__AllParameterSets]
   UnderlineColor type=Array position=24 mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   UnderlineStyle type=String position=25 mandatory=False pipeline=False aliases=[] values=[Single|Double|Curly|Dotted|Dashed] range=[] sets=[__AllParameterSets]
   Truncate type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PadCenter type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   Wrap type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorError aliases=[WCE,WError,Write-ColourError,Write-ErrorColor,Write-ErrorColour,wcerror] sets=[__AllParameterSets]
+Write-ColorError aliases=[WCE,WError,Write-ColourError,Write-ErrorColor,Write-ErrorColour,wcerror] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoNewLine type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   LogFile type=String position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoConsoleOutput type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorInfo aliases=[WCI,WInfo,Write-ColourInfo,Write-InfoColor,Write-InfoColour,wcinfo] sets=[__AllParameterSets]
+Write-ColorInfo aliases=[WCI,WInfo,Write-ColourInfo,Write-InfoColor,Write-InfoColour,wcinfo] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoNewLine type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   LogFile type=String position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoConsoleOutput type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorSuccess aliases=[WCS,WSuccess,Write-ColourSuccess,Write-SuccessColor,Write-SuccessColour,wcok,wcsuccess] sets=[__AllParameterSets]
+Write-ColorSuccess aliases=[WCS,WSuccess,Write-ColourSuccess,Write-SuccessColor,Write-SuccessColour,wcok,wcsuccess] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoNewLine type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   LogFile type=String position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoConsoleOutput type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
-Write-ColorWarning aliases=[WCW,WCWarn,WWarning,Write-ColourWarning,Write-WarningColor,Write-WarningColour,wcwarning] sets=[__AllParameterSets]
+Write-ColorWarning aliases=[WCW,WCWarn,WWarning,Write-ColourWarning,Write-WarningColor,Write-WarningColour,wcwarning] sets=[__AllParameterSets] outputs=[System.String]
   Text type=String[] position=0 mandatory=False pipeline=True aliases=[] values=[] range=[] sets=[__AllParameterSets]
   NoNewLine type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
   LogFile type=String position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
@@ -284,7 +319,12 @@ ForegroundColor Property System.Object ForegroundColor {get;set;}
 GetHashCode Method int GetHashCode()
 GetType Method type GetType()
 Gradient Property System.Object[] Gradient {get;set;}
+GradientDirection Property string GradientDirection {get;set;}
+GradientEasing Property string GradientEasing {get;set;}
+GradientHue Property string GradientHue {get;set;}
+GradientRepeat Property string GradientRepeat {get;set;}
 GradientSpace Property string GradientSpace {get;set;}
+GradientSteps Property int GradientSteps {get;set;}
 HorizontalCenter Property bool HorizontalCenter {get;set;}
 Italic Property bool Italic {get;set;}
 LinesAfter Property int LinesAfter {get;set;}

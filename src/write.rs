@@ -9,8 +9,10 @@ use pwrs::prelude::*;
 use crate::colors::{self, lookup};
 use crate::detect::{session_support, Support};
 use crate::forms::{is_white_space, read_forms, UnknownNames};
-use crate::gradient::gradient_colors;
-use crate::host::{env_var, host_ansi, host_width, removes_escape_codes, this_cmdlet, HostWriter};
+use crate::ease::Easing;
+use crate::gradient::{gradient_colors, resolve_gradient_name, split_places, Direction, GradientOptions, Repeat};
+use crate::spaces::{HuePath, Space};
+use crate::host::{env_var, host_ansi, host_width, removes_escape_codes, this_cmdlet, write_host};
 use crate::log::write_log;
 use crate::runs::{
     highlight_segments, items_text, pad_lines, parse_markup, parse_spec, plain_segment, segments_text, single_line, split_segments,
@@ -198,6 +200,56 @@ fn is_color_element(obj: &PsObject, nested: bool) -> PsResult<bool> {
     })
 }
 
+/// The validation script of PSWriteColorEX's -Style, which its refusal quotes.
+const STYLE_SCRIPT: &str = "$_ -is [string] -or $_ -is [int] -or $_ -is [int[]] -or $_ -is [string[]] -or $_ -is [object[]]";
+
+/// Whether a value passes PSWriteColorEX's -Style script: a string, an Int32, an int[], a
+/// string[], or an array of any class, which PowerShell's -is [object[]] takes; not an array of
+/// another structure, such as long[].
+fn passes_style_script(obj: &PsObject) -> PsResult<bool> {
+    use pwrs::sys::*;
+    if matches!(obj.type_tag()?, PS_TYPE_STRING | PS_TYPE_I32) {
+        return Ok(true);
+    }
+    let name = obj.type_name()?;
+    if !name.ends_with("[]") {
+        return Ok(false);
+    }
+    if name == "System.Int32[]" {
+        return Ok(true);
+    }
+    let element_type = obj.call("GetType", &[])?.call("GetElementType", &[])?;
+    Ok(!bool::from_ps(&element_type.get("IsValueType")?)?)
+}
+
+/// -Style checked as PowerShell binds it to PSWriteColorEX's validation script: the value, or each
+/// element of an array or list, passes the script and is not $null. A refusal is in PowerShell's
+/// words.
+fn check_style(value: Option<&PsObject>) -> PsResult<()> {
+    let refuse = |reason: String| {
+        PsError::new(ErrorCategory::InvalidData, "ParameterArgumentValidationError", format!("Cannot validate argument on parameter 'Style'. {reason}")).terminating()
+    };
+    let Some(value) = value.filter(|v| !v.is_null()) else {
+        return Err(refuse(
+            "The argument is null, empty, or an element of the argument collection contains a null value. Supply a collection that does not contain any null values and then try the command again."
+                .to_string(),
+        ));
+    };
+    let elements = if is_list(value)? { Vec::<PsObject>::from_ps(value)? } else { vec![value.clone()] };
+    for element in elements {
+        if element.is_null() {
+            return Err(refuse("The argument is null. Provide a valid value for the argument, and then try running the command again.".to_string()));
+        }
+        if !passes_style_script(&element)? {
+            let shown = String::from_ps(&element.call("ToString", &[])?)?;
+            return Err(refuse(format!(
+                "The \"{STYLE_SCRIPT}\" validation script for the argument with value \"{shown}\" did not return a result of True. Determine why the validation script failed, and then try the command again."
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Reads -Color or -BackGroundColor: each entry a color, or $null, which leaves its segment as it
 /// is. An entry of any other kind is refused, as PSWriteColorEX refuses it.
 pub fn color_list(values: &[PsObject], parameter: &str) -> PsResult<Vec<ColorArg>> {
@@ -318,9 +370,17 @@ pub struct WriteOptions {
     pub gradient: Option<Vec<ColorArg>>,
     pub background_gradient: Option<Vec<ColorArg>>,
     pub gradient_space: String,
+    pub gradient_hue: String,
+    pub gradient_easing: String,
+    pub gradient_repeat: String,
+    pub gradient_direction: String,
+    pub gradient_steps: i32,
     pub ansi4: bool,
     pub ansi8: bool,
     pub ansi24: bool,
+    /// -ColorSupport: the color support to write for in place of the terminal's and the color
+    /// variables. Left unset, the support is detected.
+    pub color_support: Option<Support>,
     pub style: Option<StyleArg>,
     pub style_profile: Option<PsObject>,
     pub default: bool,
@@ -381,9 +441,15 @@ impl Default for WriteOptions {
             gradient: None,
             background_gradient: None,
             gradient_space: "OKLab".to_string(),
+            gradient_hue: "Shorter".to_string(),
+            gradient_easing: "Linear".to_string(),
+            gradient_repeat: "None".to_string(),
+            gradient_direction: "Forward".to_string(),
+            gradient_steps: 0,
             ansi4: false,
             ansi8: false,
             ansi24: false,
+            color_support: None,
             style: None,
             style_profile: None,
             default: false,
@@ -434,21 +500,27 @@ impl Default for WriteOptions {
 }
 
 impl WriteOptions {
-    /// Sets the parameters a style profile's hashtable names, other than those given.
-    pub fn apply_profile(&mut self, params: &PsHashtable, only_unbound: bool) -> PsResult<()> {
+    /// Sets the parameters a style profile's hashtable names, other than those given, and returns
+    /// the parameter check's error for each value outside its parameter's set, which leaves that
+    /// parameter as it is, for the caller to write.
+    pub fn apply_profile(&mut self, params: &PsHashtable, only_unbound: bool) -> PsResult<Vec<PsError>> {
+        let mut refusals = Vec::new();
         for key in params.keys()? {
             let lower = key.to_ascii_lowercase();
             if only_unbound && self.bound.contains(&lower) {
                 continue;
             }
             let value = params.get(&key)?;
-            self.set_parameter(&lower, &value)?;
+            if let Some(refusal) = self.set_parameter(&lower, &value)? {
+                refusals.push(refusal);
+            }
         }
-        Ok(())
+        Ok(refusals)
     }
 
-    /// Sets one parameter by its lowercase name from a value, as splatting would bind it.
-    pub fn set_parameter(&mut self, lower: &str, value: &PsObject) -> PsResult<()> {
+    /// Sets one parameter by its lowercase name from a value, as splatting would bind it. A value
+    /// outside the parameter's set leaves it as it is, and returns the parameter check's error.
+    pub fn set_parameter(&mut self, lower: &str, value: &PsObject) -> PsResult<Option<PsError>> {
         let flag = |v: &PsObject| bool::from_ps(v).unwrap_or(false);
         let number = |v: &PsObject| i64::from_ps(v).map(|n| n as i32).unwrap_or(0);
         let text = |v: &PsObject| if v.is_null() { Ok(String::new()) } else { String::from_ps(v) };
@@ -464,9 +536,14 @@ impl WriteOptions {
             "backgroundcolor" => self.background = list(value)?,
             "gradient" => self.gradient = Some(list(value)?),
             "backgroundgradient" => self.background_gradient = Some(list(value)?),
-            "gradientspace" => self.gradient_space = text(value)?,
+            "gradientspace" => return Ok(set_in_value_set("GradientSpace", text(value)?, &mut self.gradient_space)),
+            "gradienthue" => return Ok(set_in_value_set("GradientHue", text(value)?, &mut self.gradient_hue)),
+            "gradienteasing" => return Ok(set_in_value_set("GradientEasing", text(value)?, &mut self.gradient_easing)),
+            "gradientrepeat" => return Ok(set_in_value_set("GradientRepeat", text(value)?, &mut self.gradient_repeat)),
+            "gradientdirection" => return Ok(set_in_value_set("GradientDirection", text(value)?, &mut self.gradient_direction)),
+            "gradientsteps" => self.gradient_steps = number(value),
             "underlinecolor" => self.underline_color = list(value)?,
-            "underlinestyle" => self.underline_style = text(value)?,
+            "underlinestyle" => return Ok(set_in_value_set("UnderlineStyle", text(value)?, &mut self.underline_style)),
             "style" => self.style = StyleArg::from_object(value)?,
             "starttab" => self.start_tab = number(value),
             "startspaces" => self.start_spaces = number(value),
@@ -496,7 +573,7 @@ impl WriteOptions {
             "wrap" => self.wrap = flag(value),
             _ => {}
         }
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -600,7 +677,6 @@ struct Writer<'a, 'ps> {
     ps: &'a Pipeline<'ps>,
     debugging: bool,
     silent: bool,
-    host: Option<HostWriter>,
 }
 
 impl Writer<'_, '_> {
@@ -635,9 +711,9 @@ impl Writer<'_, '_> {
         Ok(())
     }
 
-    fn host(&mut self) -> &mut HostWriter {
-        let ps = self.ps;
-        self.host.get_or_insert_with(|| HostWriter::new(ps))
+    /// One write to the host, as Write-Host makes it.
+    fn write_host(&self, text: &str, fg: Option<&str>, bg: Option<&str>, no_newline: bool) -> PsResult<()> {
+        write_host(self.ps, text, fg, bg, no_newline)
     }
 }
 
@@ -936,9 +1012,11 @@ struct Piece {
 impl LineWriter<'_> {
     /// The text of a line with its colors, styles and links as escape codes. A run's markup or
     /// -Highlight colors and styles go over its segment's. A segment with no text color of its
-    /// own takes the gradient, character by character from the run's place in it, and one with no
-    /// background color the background gradient. Each run with codes ends with a reset; a link
-    /// opens before the codes of the first run it covers and closes after the last.
+    /// own takes the gradient from the run's text gradient index, one step for each character that
+    /// shows it (white space only where the run's shows_space is set), and one with no background
+    /// color takes the background gradient from the run's gradient index, one step for each
+    /// character. Each run with codes ends with a reset; a link opens before the codes of the
+    /// first run it covers and closes after the last.
     fn ansi(&self, items: &[Item]) -> String {
         let m = &self.modes;
         let mut line = String::new();
@@ -987,9 +1065,15 @@ impl LineWriter<'_> {
                     }
                     line.push_str(&codes);
                     let mut at = run.gradient_index;
+                    let mut text_at = run.text_gradient_index;
                     for character in &run.characters {
-                        for (gradient, layer) in [(fg_gradient, 38), (bg_gradient, 48)] {
-                            let Some(step) = gradient.and_then(|g| g.get(at)) else { continue };
+                        let shows = run.shows_space || !character.chars().all(char::is_whitespace);
+                        let steps = [
+                            (fg_gradient.filter(|_| shows).and_then(|g| g.get(text_at)), 38),
+                            (bg_gradient.and_then(|g| g.get(at)), 48),
+                        ];
+                        for (step, layer) in steps {
+                            let Some(step) = step else { continue };
                             match step {
                                 ColorArg::List(_) if m.ansi24 => {
                                     let [r, g, b] = step.rgb().unwrap_or([0, 0, 0]);
@@ -1003,6 +1087,9 @@ impl LineWriter<'_> {
                         }
                         line.push_str(character);
                         at += 1;
+                        if shows {
+                            text_at += 1;
+                        }
                     }
                     let _ = write!(line, "{ESC}[0m");
                     continue;
@@ -1133,7 +1220,7 @@ pub fn compile_highlight(ps: &Pipeline<'_>, highlight: &PsObject, silent: bool) 
 
 /// Why a pattern does not compile, as .NET's innermost exception says it. The constructor call
 /// above reaches the exception only wrapped, so PowerShell compiles the pattern once more here,
-/// on this path alone, and answers the message.
+/// on this path alone, and returns the message.
 fn pattern_error(pattern: &str) -> PsResult<String> {
     const SCRIPT: &str = "param($Pattern) try { $null = [regex]::new($Pattern, 'IgnoreCase, CultureInvariant') } catch { $reason = $_.Exception; while ($reason.InnerException) { $reason = $reason.InnerException }; $reason.Message }";
     let script = PsType::from_name("System.Management.Automation.ScriptBlock").call_static("Create", &[SCRIPT.into_ps()?])?;
@@ -1167,8 +1254,12 @@ fn highlight_matches(regex: &PsObject, line: &str) -> PsResult<Vec<(usize, usize
 
 /// Writes text to the host, the log file, or `capture` for Format-ColorEX, as Write-ColorEX does.
 pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntry], mut capture: Option<&mut Vec<String>>) -> PsResult<()> {
-    let mut w = Writer { ps, debugging: o.debugging, silent: o.silent, host: None };
+    let mut w = Writer { ps, debugging: o.debugging, silent: o.silent };
     w.debug(|| format!("Starting Write-ColorEX with Text count: {}", o.text.len()))?;
+
+    // A single name of a named gradient stands for its colors
+    resolve_gradient_name(&mut o.gradient);
+    resolve_gradient_name(&mut o.background_gradient);
 
     if let Some(gradient) = &o.gradient
         && list_is_true(gradient, ColorArg::is_true)
@@ -1205,7 +1296,9 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
     if let Some(profile) = o.style_profile.clone() {
         w.debug(|| format!("Applying style profile: {}", profile.get("Name").and_then(|n| String::from_ps(&n)).unwrap_or_default()))?;
         let params = style::write_color_params(&profile)?;
-        o.apply_profile(&params, true)?;
+        for refusal in o.apply_profile(&params, true)? {
+            ps.write_error(&refusal)?;
+        }
     }
     if o.default
         && let Some(default) = style::default_style()?
@@ -1213,9 +1306,19 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         w.debug(|| "Applying default style profile".to_string())?;
         if o.style_profile.is_none() {
             let params = style::write_color_params(&default)?;
-            o.apply_profile(&params, true)?;
+            for refusal in o.apply_profile(&params, true)? {
+                ps.write_error(&refusal)?;
+            }
         }
     }
+
+    // A style's gradient may be a named gradient too
+    resolve_gradient_name(&mut o.gradient);
+    resolve_gradient_name(&mut o.background_gradient);
+
+    // A gradient color's place, given with '@' after it, comes off before the color is read
+    let gradient_places = o.gradient.as_mut().map(|gradient| split_places(gradient)).unwrap_or_default();
+    let background_places = o.background_gradient.as_mut().map(|gradient| split_places(gradient)).unwrap_or_default();
 
     // Colors written #RGB, 0xRGB, rgb(r, g, b) or hsl(h, s%, l%) read as #RRGGBB, with a warning
     // for each name the color table lacks
@@ -1400,15 +1503,18 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         }
     }
 
+    // -ColorSupport, when given, stands in for the terminal and the color variables
+    let given = o.color_support;
+
     // The color variables, read on each call since they can change at any time. FORCE_COLOR 1 to
     // 3 keeps colors on in its mode; FORCE_COLOR=0 and NO_COLOR turn them off; CLICOLOR_FORCE, set
     // to anything but 0, keeps them on; CLICOLOR=0 and TERM=dumb turn them off. The first of these
     // set decides.
-    let force_color = env_var("FORCE_COLOR")?;
+    let force_color = if given.is_none() { env_var("FORCE_COLOR")? } else { None };
     let forced = matches!(force_color.as_deref(), Some("1" | "2" | "3"));
     let mut cli_color_forced = false;
     let mut color_disabled = false;
-    if !forced {
+    if given.is_none() && !forced {
         if force_color.as_deref() == Some("0") || env_var("NO_COLOR")?.is_some_and(|v| !v.is_empty()) {
             color_disabled = true;
         } else if env_var("CLICOLOR_FORCE")?.is_some_and(|v| !v.is_empty() && v != "0") {
@@ -1452,7 +1558,10 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         o.ansi24 = false;
     } else if !using_ansi {
         // Console colors only: no ANSI detection needed, only whether the line can go out as one call
-        compose_line = if forced || cli_color_forced {
+        compose_line = if let Some(support) = given {
+            // A support given keeps the colors as escape codes whatever the host, None as console colors
+            support != Support::None && (capture.is_some() || !o.no_console_output)
+        } else if forced || cli_color_forced {
             // FORCE_COLOR and CLICOLOR_FORCE keep the colors as escape codes, whatever the host
             capture.is_some() || !o.no_console_output
         } else if capture.is_some() {
@@ -1463,7 +1572,10 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         };
         w.debug(|| format!("Console colors only; one call per line: {}", ps_bool(compose_line)))?;
     } else {
-        let support = if forced {
+        let support = if let Some(support) = given {
+            w.debug(|| format!("Color support given: {}", support.as_str()))?;
+            support
+        } else if forced {
             let value = force_color.as_deref().unwrap_or_default();
             w.debug(|| format!("FORCE_COLOR environment variable detected: {value}"))?;
             let support = match value {
@@ -1558,6 +1670,10 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         }
     }
 
+    // Whether bold shows as a font: -Bold lightens the colors where the terminal draws bold as
+    // brighter colors, and under -ColorSupport None, whose console colors carry no bold
+    let bold_fonts = bold_fonts && given != Some(Support::None);
+
     if !o.no_console_output {
         let mut window_width = 0;
         if o.blank_line || o.horizontal_center || (o.wrap && o.auto_pad <= 0) {
@@ -1607,50 +1723,6 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
             single_line(segments.clone())
         };
 
-        // Each run's characters, and where it starts in the gradients, which run across every
-        // character written, padding included. A color code is never put inside a character.
-        let gradient_on = |g: &Option<Vec<ColorArg>>| g.as_ref().is_some_and(|g| list_is_true(g, ColorArg::is_true) && g.len() >= 2);
-        let mut total_chars = 0usize;
-        if gradient_on(&o.gradient) || gradient_on(&o.background_gradient) {
-            for run in lines.iter_mut().flatten().flat_map(|item| item.runs.iter_mut()) {
-                if run.characters.is_empty() {
-                    run.characters = split_display_characters(&run.text).into_iter().map(str::to_string).collect();
-                }
-                run.gradient_index = total_chars;
-                total_chars += run.characters.len();
-            }
-        }
-
-        let oklab = !o.gradient_space.eq_ignore_ascii_case("RGB");
-        let mut gradient_array: Option<Vec<ColorArg>> = None;
-        if let Some(gradient) = o.gradient.clone().filter(|g| list_is_true(g, ColorArg::is_true) && g.len() >= 2) {
-            w.debug(|| "Calculating gradient for text".to_string())?;
-            w.debug(|| format!("Total characters for gradient: {total_chars}"))?;
-            if gradient.len() > total_chars {
-                w.warn(&format!(
-                    "Gradient has {} colors but text only has {total_chars} characters. Applying standard coloring instead.",
-                    gradient.len()
-                ))?;
-                w.debug(|| format!("Gradient disabled: More colors ({}) than characters ({total_chars})", gradient.len()))?;
-                o.gradient = None;
-            } else {
-                w.debug(|| format!("Generating gradient in {} mode", if o.ansi24 { "TrueColor" } else { "ANSI8" }))?;
-                gradient_array = Some(gradient_colors(ps, &gradient, total_chars, o.ansi24, oklab)?);
-            }
-        }
-        let mut background_gradient_array: Option<Vec<ColorArg>> = None;
-        if let Some(gradient) = o.background_gradient.clone().filter(|g| list_is_true(g, ColorArg::is_true) && g.len() >= 2) {
-            if gradient.len() > total_chars {
-                w.warn(&format!(
-                    "BackGroundGradient has {} colors but text only has {total_chars} characters. Applying standard coloring instead.",
-                    gradient.len()
-                ))?;
-                o.background_gradient = None;
-            } else {
-                background_gradient_array = Some(gradient_colors(ps, &gradient, total_chars, o.ansi24, oklab)?);
-            }
-        }
-
         let modes = Modes {
             ansi4: o.ansi4,
             ansi8: o.ansi8,
@@ -1662,6 +1734,88 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
             ansi_support,
             lighten: o.bold && !bold_fonts,
         };
+
+        // Each segment's underline color, cycling through -UnderlineColor. A segment with no
+        // other underline takes a single one.
+        let mut underlines: Vec<String> = Vec::new();
+        if ansi_support && !o.underline_color.is_empty() {
+            let underlined = o.underline || o.double_underline || !o.underline_style.is_empty();
+            for i in 0..segment_count {
+                let mut code = underline_sequence(&mut w, &modes, &o.underline_color[i % o.underline_color.len()])?;
+                if !code.is_empty() && !underlined {
+                    let own_underline = o.style.as_ref().is_some_and(StyleArg::is_true)
+                        && match &o.style {
+                            Some(StyleArg::List(items)) => match items.get(i) {
+                                Some(StyleArg::List(names)) => names.iter().any(is_underline_style),
+                                Some(single) => is_underline_style(single),
+                                None => false,
+                            },
+                            Some(single) if i == 0 => is_underline_style(single),
+                            _ => false,
+                        };
+                    if !own_underline {
+                        code.insert_str(0, underline_style_code("Single"));
+                    }
+                }
+                underlines.push(code);
+            }
+        }
+
+        // Each run's characters, and where it starts in the gradients. The background gradient
+        // runs across every character written, padding included. The text gradient runs across
+        // the characters that show its color: white space takes none unless a line under, through
+        // or over it, or -Reverse, shows it. A color code is never put inside a character.
+        let gradient_on = |g: &Option<Vec<ColorArg>>| g.as_ref().is_some_and(|g| list_is_true(g, ColorArg::is_true) && g.len() >= 2);
+        let mut total_chars = 0usize;
+        let mut text_chars = 0usize;
+        if gradient_on(&o.gradient) || gradient_on(&o.background_gradient) {
+            let line_shows_space = o.underline || o.double_underline || !o.underline_style.is_empty() || o.crossed_out || o.overline || o.reverse;
+            for item in lines.iter_mut().flatten() {
+                let segment_shows_space = line_shows_space
+                    || underlines.get(item.index).is_some_and(|code| !code.is_empty())
+                    || segment_shows_white_space(o.style.as_ref(), item.index);
+                for run in &mut item.runs {
+                    if run.characters.is_empty() {
+                        run.characters = split_display_characters(&run.text).into_iter().map(str::to_string).collect();
+                    }
+                    run.gradient_index = total_chars;
+                    run.text_gradient_index = text_chars;
+                    run.shows_space = segment_shows_space || run.spec.styles.iter().any(|name| shows_white_space(name));
+                    total_chars += run.characters.len();
+                    text_chars += run.characters.iter().filter(|character| run.shows_space || !character.chars().all(char::is_whitespace)).count();
+                }
+            }
+        }
+
+        let options = GradientOptions::from_names(&o.gradient_space, &o.gradient_hue, &o.gradient_easing, &o.gradient_repeat, &o.gradient_direction, o.gradient_steps)?;
+        let mut gradient_array: Option<Vec<ColorArg>> = None;
+        if let Some(gradient) = o.gradient.clone().filter(|g| list_is_true(g, ColorArg::is_true) && g.len() >= 2) {
+            w.debug(|| "Calculating gradient for text".to_string())?;
+            w.debug(|| format!("Total characters for gradient: {text_chars}"))?;
+            if gradient.len() > text_chars {
+                w.warn(&format!(
+                    "Gradient has {} colors but text only has {text_chars} characters. Applying standard coloring instead.",
+                    gradient.len()
+                ))?;
+                w.debug(|| format!("Gradient disabled: More colors ({}) than characters ({text_chars})", gradient.len()))?;
+                o.gradient = None;
+            } else {
+                w.debug(|| format!("Generating gradient in {} mode", if o.ansi24 { "TrueColor" } else { "ANSI8" }))?;
+                gradient_array = Some(gradient_colors(ps, &gradient, &gradient_places, text_chars, o.ansi24, &options)?);
+            }
+        }
+        let mut background_gradient_array: Option<Vec<ColorArg>> = None;
+        if let Some(gradient) = o.background_gradient.clone().filter(|g| list_is_true(g, ColorArg::is_true) && g.len() >= 2) {
+            if gradient.len() > total_chars {
+                w.warn(&format!(
+                    "BackGroundGradient has {} colors but text only has {total_chars} characters. Applying standard coloring instead.",
+                    gradient.len()
+                ))?;
+                o.background_gradient = None;
+            } else {
+                background_gradient_array = Some(gradient_colors(ps, &gradient, &background_places, total_chars, o.ansi24, &options)?);
+            }
+        }
 
         // Each segment's text and background color, cycling through -Color and -BackGroundColor,
         // converted for the mode in use
@@ -1692,32 +1846,6 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
                         run.mode_bg = mode_color(&mut w, &modes, &ColorArg::Name(bg), index, true)?;
                     }
                 }
-            }
-        }
-
-        // Each segment's underline color, cycling through -UnderlineColor. A segment with no
-        // other underline takes a single one.
-        let mut underlines: Vec<String> = Vec::new();
-        if ansi_support && !o.underline_color.is_empty() {
-            let underlined = o.underline || o.double_underline || !o.underline_style.is_empty();
-            for i in 0..segment_count {
-                let mut code = underline_sequence(&mut w, &modes, &o.underline_color[i % o.underline_color.len()])?;
-                if !code.is_empty() && !underlined {
-                    let own_underline = o.style.as_ref().is_some_and(StyleArg::is_true)
-                        && match &o.style {
-                            Some(StyleArg::List(items)) => match items.get(i) {
-                                Some(StyleArg::List(names)) => names.iter().any(is_underline_style),
-                                Some(single) => is_underline_style(single),
-                                None => false,
-                            },
-                            Some(single) if i == 0 => is_underline_style(single),
-                            _ => false,
-                        };
-                    if !own_underline {
-                        code.insert_str(0, underline_style_code("Single"));
-                    }
-                }
-                underlines.push(code);
             }
         }
 
@@ -1780,7 +1908,7 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         for _ in 0..o.lines_before.max(0) {
             match capture.as_deref_mut() {
                 Some(lines) => lines.push(String::new()),
-                None => w.host().write("", None, None, false)?,
+                None => w.write_host("", None, None, false)?,
             }
         }
 
@@ -1813,7 +1941,7 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
                     Some(lines) => lines.push(line),
                     None => {
                         if !line.is_empty() || !line_no_new_line {
-                            w.host().write(&line, None, None, line_no_new_line)?;
+                            w.write_host(&line, None, None, line_no_new_line)?;
                         }
                     }
                 }
@@ -1836,7 +1964,7 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
                     Some(lines) => lines.push(line),
                     None => {
                         if !line.is_empty() || !line_no_new_line {
-                            w.host().write(&line, None, None, line_no_new_line)?;
+                            w.write_host(&line, None, None, line_no_new_line)?;
                         }
                     }
                 }
@@ -1848,13 +1976,13 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
                     lines.push(merged.iter().map(|piece| piece.text.as_str()).collect());
                 } else if merged.is_empty() {
                     if !line_no_new_line {
-                        w.host().write("", None, None, false)?;
+                        w.write_host("", None, None, false)?;
                     }
                 } else {
                     let last = merged.len() - 1;
                     for (p, piece) in merged.iter().enumerate() {
                         let no_newline = p < last || line_no_new_line;
-                        w.host().write(&piece.text, piece.fg, piece.bg, no_newline)?;
+                        w.write_host(&piece.text, piece.fg, piece.bg, no_newline)?;
                     }
                 }
             }
@@ -1863,7 +1991,7 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
         for _ in 0..o.lines_after.max(0) {
             match capture.as_deref_mut() {
                 Some(lines) => lines.push(String::new()),
-                None => w.host().write("", None, None, false)?,
+                None => w.write_host("", None, None, false)?,
             }
         }
     }
@@ -1879,6 +2007,29 @@ pub fn render(ps: &Pipeline<'_>, mut o: WriteOptions, highlight: &[HighlightEntr
 /// Whether a -Style entry names an underline: Underline, DoubleUnderline, Curly, Dotted or Dashed.
 fn is_underline_style(style: &StyleArg) -> bool {
     matches!(style, StyleArg::Name(name) if ["Underline", "DoubleUnderline", "Curly", "Dotted", "Dashed"].iter().any(|n| n.eq_ignore_ascii_case(name)))
+}
+
+/// Whether a style draws a line under, through or over a character or reverses it, so that white
+/// space shows its text color.
+fn shows_white_space(name: &str) -> bool {
+    ["Underline", "DoubleUnderline", "Curly", "Dotted", "Dashed", "CrossedOut", "Overline", "Reverse"]
+        .iter()
+        .any(|n| n.eq_ignore_ascii_case(name))
+}
+
+/// Whether -Style gives a segment a style that shows white space: its entry at the segment's
+/// index, a name or a list of names, or a single style, which is the first segment's.
+fn segment_shows_white_space(style: Option<&StyleArg>, index: usize) -> bool {
+    let shows = |entry: &StyleArg| match entry {
+        StyleArg::Name(name) => shows_white_space(name),
+        StyleArg::List(names) => names.iter().any(|name| matches!(name, StyleArg::Name(name) if shows_white_space(name))),
+        _ => false,
+    };
+    match style {
+        Some(StyleArg::List(items)) => items.get(index).is_some_and(shows),
+        Some(single) if index == 0 => shows(single),
+        _ => false,
+    }
 }
 
 /// The RGB value of a hex code as Convert-HexToRGB reads it: gray, with its warning, for a code
@@ -1929,7 +2080,14 @@ pub struct WriteColorEX {
     /// The background color of each text segment, in the same forms as -Color.
     #[param(position = 2, alias = ["B", "BGC"], clr = "System.Array")]
     pub back_ground_color: Option<PsObject>,
-    /// Two or more colors to blend across the characters of the text.
+    /// Two or more colors to blend across the characters of the text, or the name of a named
+    /// gradient: Rainbow, Sunset, Ocean, Forest, Fire, Ice, Neon, Pastel, Grayscale and Progress,
+    /// and gradient-string's Atlas, Cristal, Teen, Mind, Morning, Vice, Passion, Fruit, Instagram,
+    /// Retro and Summer. With at least as many characters as colors, each color given falls on a
+    /// character of its own. A color may give its place along the text after an '@', as a percent:
+    /// 'Gold@40' puts Gold 40% of the way along, on the nearest character, and colors without a
+    /// place spread evenly between the placed ones around them, as CSS places color stops. White
+    /// space takes no color unless it is underlined, crossed out, overlined or reversed.
     #[param(position = 3, alias = ["Grad"])]
     pub gradient: Option<Vec<PsObject>>,
     /// Uses ANSI 4-bit colors (16 colors).
@@ -1941,6 +2099,13 @@ pub struct WriteColorEX {
     /// Uses 24-bit TrueColor (RGB).
     #[param(alias = ["A24", "TrueColor", "TC"])]
     pub ANSI24: bool,
+    /// The color support to write for, in place of the terminal's: None, ANSI4, ANSI8 or
+    /// TrueColor, the values Test-AnsiSupport reports. It replaces the whole check, the terminal,
+    /// the host, redirected output and the color variables, so the colors depend only on the
+    /// arguments. -Bold lightens the colors where bold cannot show: always with None, and with the
+    /// others where the terminal draws bold as brighter colors.
+    #[param(validate_set = ["None", "ANSI4", "ANSI8", "TrueColor"])]
+    pub color_support: Option<String>,
     /// Styles for the text segments in order: one style per segment, or an array of styles for a
     /// segment that takes several.
     #[param(position = 4, alias = ["S"])]
@@ -2065,13 +2230,42 @@ pub struct WriteColorEX {
     /// Swaps the text and background colors.
     #[param(alias = ["Invert"])]
     pub reverse: bool,
-    /// Two or more colors to blend across the background of the text.
+    /// Two or more colors to blend across the background of the text, or the name of a named
+    /// gradient, over every character, white space included.
     #[param(position = 22, alias = ["BGGrad"])]
     pub back_ground_gradient: Option<Vec<PsObject>>,
-    /// How the gradients blend their colors: OKLab, where equal steps look equally far apart, or
-    /// RGB, each channel on its own.
-    #[param(position = 23, validate_set = ["OKLab", "RGB"])]
+    /// How the gradients blend their colors: OKLab, where equal steps look equally far apart; RGB,
+    /// each channel on its own; LinearRGB, each channel in linear light, as light mixes; OKLCH,
+    /// HSL, HSV and LCh, around the hue wheel; or Lab, CIELAB as CSS lab() defines it.
+    #[param(position = 23, validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"])]
     pub gradient_space: Option<String>,
+    /// The way round the hue wheel from one color to the next in OKLCH, HSL, HSV and LCh, as CSS
+    /// Color 4 names the ways: Shorter (the default), Longer, Increasing or Decreasing. A gray has
+    /// no hue and takes the hue of the color it blends with.
+    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"])]
+    pub gradient_hue: Option<String>,
+    /// A curve that moves the colors along the text: Linear (the default), or the In, Out and
+    /// InOut forms of Sine, Quad, Cubic, Quart, Quint, Expo, Circ, Back, Elastic and Bounce, as
+    /// easings.net draws them.
+    #[param(validate_set = [
+        "Linear", "InSine", "OutSine", "InOutSine", "InQuad", "OutQuad", "InOutQuad", "InCubic", "OutCubic", "InOutCubic", "InQuart", "OutQuart",
+        "InOutQuart", "InQuint", "OutQuint", "InOutQuint", "InExpo", "OutExpo", "InOutExpo", "InCirc", "OutCirc", "InOutCirc", "InBack", "OutBack",
+        "InOutBack", "InElastic", "OutElastic", "InOutElastic", "InBounce", "OutBounce", "InOutBounce"
+    ])]
+    pub gradient_easing: Option<String>,
+    /// What the gradients do past their first and last colors when those are placed with '@'
+    /// inside the text: None (the default) holds the end colors, Repeat starts over and Mirror
+    /// runs back and forth, as CSS gradients and repeating gradients do.
+    #[param(validate_set = ["None", "Repeat", "Mirror"])]
+    pub gradient_repeat: Option<String>,
+    /// The way the gradients run across the text: Forward (the default), Reverse, CenterOut or
+    /// EdgesIn.
+    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"])]
+    pub gradient_direction: Option<String>,
+    /// Cuts the gradients into this many bands of solid color, the first band in the first color
+    /// and the last in the last; 0, the default, blends smoothly.
+    #[param(validate_range(0, 2147483647))]
+    pub gradient_steps: i32,
     /// The color of the underline of each text segment, in the same forms as -Color. A segment
     /// with no other underline is underlined.
     #[param(position = 24, clr = "System.Array")]
@@ -2094,17 +2288,29 @@ pub struct WriteColorEX {
 
 /// The parameter names of Write-ColorEX, for which ones a call gave.
 const PARAMETER_NAMES: &[&str] = &[
-    "Text", "Color", "BackGroundColor", "Gradient", "ANSI4", "ANSI8", "ANSI24", "Style", "StyleProfile", "Default", "Bold", "Faint", "Italic", "Underline",
+    "Text", "Color", "BackGroundColor", "Gradient", "ANSI4", "ANSI8", "ANSI24", "ColorSupport", "Style", "StyleProfile", "Default", "Bold", "Faint", "Italic", "Underline",
     "Blink", "CrossedOut", "DoubleUnderline", "Overline", "StartTab", "LinesBefore", "LinesAfter", "StartSpaces", "LogFile", "LogPath", "LogLevel",
     "LogTime", "DateTimeFormat", "LogRetry", "Encoding", "ShowTime", "NoNewLine", "HorizontalCenter", "BlankLine", "NoConsoleOutput", "Debugging",
     "Silent", "AutoPad", "PadLeft", "PadChar", "Markup", "Split", "SplitAround", "SplitEvenly", "Highlight", "Link", "Reverse", "BackGroundGradient",
-    "GradientSpace", "UnderlineColor", "UnderlineStyle", "Truncate", "PadCenter", "Wrap",
+    "GradientSpace", "GradientHue", "GradientEasing", "GradientRepeat", "GradientDirection", "GradientSteps", "UnderlineColor", "UnderlineStyle", "Truncate",
+    "PadCenter", "Wrap",
 ];
 
-/// The checks Write-ColorEX makes before its first string: each entry of -Color,
-/// -BackGroundColor and -UnderlineColor is a color, and one way of splitting is given. Answers
-/// -Highlight's patterns compiled.
-pub fn begin_checks(ps: &Pipeline<'_>, colors: [(Option<&PsObject>, &str); 3], split_evenly: bool, highlight: Option<&PsObject>, silent: bool) -> PsResult<Vec<HighlightEntry>> {
+/// The checks Write-ColorEX makes before its first string: -Style, when given, passes the check
+/// PowerShell makes as it binds PSWriteColorEX's, each entry of -Color, -BackGroundColor and
+/// -UnderlineColor is a color, and one way of splitting is given. Returns -Highlight's patterns
+/// compiled.
+pub fn begin_checks(
+    ps: &Pipeline<'_>,
+    style: Option<&PsObject>,
+    colors: [(Option<&PsObject>, &str); 3],
+    split_evenly: bool,
+    highlight: Option<&PsObject>,
+    silent: bool,
+) -> PsResult<Vec<HighlightEntry>> {
+    if ps.parameter_is_bound("Style") {
+        check_style(style)?;
+    }
     for (value, parameter) in colors {
         color_parameter(value, parameter)?;
     }
@@ -2122,6 +2328,7 @@ impl Cmdlet for WriteColorEX {
     fn begin(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
         self.highlight_entries = begin_checks(
             ps,
+            self.style.as_ref(),
             [
                 (self.color.as_ref(), "Color"),
                 (self.back_ground_color.as_ref(), "BackGroundColor"),
@@ -2154,9 +2361,15 @@ impl Cmdlet for WriteColorEX {
                 None => None,
             },
             gradient_space: self.gradient_space.clone().unwrap_or_else(|| "OKLab".to_string()),
+            gradient_hue: self.gradient_hue.clone().unwrap_or_else(|| "Shorter".to_string()),
+            gradient_easing: self.gradient_easing.clone().unwrap_or_else(|| "Linear".to_string()),
+            gradient_repeat: self.gradient_repeat.clone().unwrap_or_else(|| "None".to_string()),
+            gradient_direction: self.gradient_direction.clone().unwrap_or_else(|| "Forward".to_string()),
+            gradient_steps: self.gradient_steps,
             ansi4: self.ANSI4,
             ansi8: self.ANSI8,
             ansi24: self.ANSI24,
+            color_support: self.color_support.as_deref().and_then(Support::from_name),
             style: style_argument(self.style.as_ref())?,
             style_profile: self.style_profile.clone().filter(|p| !p.is_null()),
             default: self.default,
@@ -2225,6 +2438,76 @@ pub fn color_parameter(value: Option<&PsObject>, parameter: &str) -> PsResult<Ve
         Some(array) if !array.is_null() => color_list(&Vec::<PsObject>::from_ps(array)?, parameter),
         _ => Ok(Vec::new()),
     }
+}
+
+/// The Write-ColorEX parameters that take one of a set of values, each with its values in the
+/// order its ValidateSet lists them.
+fn value_sets() -> [(&'static str, Vec<&'static str>); 6] {
+    [
+        ("GradientSpace", Space::ALL.iter().map(|space| space.name()).collect()),
+        ("GradientHue", HuePath::ALL.iter().map(|path| path.name()).collect()),
+        ("GradientEasing", Easing::ALL.iter().map(|easing| easing.name()).collect()),
+        ("GradientRepeat", Repeat::ALL.iter().map(|repeat| repeat.name()).collect()),
+        ("GradientDirection", Direction::ALL.iter().map(|direction| direction.name()).collect()),
+        ("UnderlineStyle", vec!["Single", "Double", "Curly", "Dotted", "Dashed"]),
+    ]
+}
+
+/// The error PowerShell's parameter check gives for a value outside a parameter's set, as one that
+/// does not stop the caller.
+fn set_refusal(parameter: &str, given: &str, set: &[&str]) -> PsError {
+    PsError::new(
+        ErrorCategory::InvalidData,
+        "ParameterArgumentValidationError",
+        format!(
+            "Cannot validate argument on parameter '{parameter}'. The argument \"{given}\" does not belong to the set \"{}\" specified by the ValidateSet attribute. Supply an argument that is in the set and then try the command again.",
+            set.join(",")
+        ),
+    )
+}
+
+/// Puts a value a style profile gives one of the parameters value_sets lists in `slot` when it
+/// is in the parameter's set, compared without regard to case; for one outside, leaves `slot` as
+/// it is and returns the parameter check's error.
+fn set_in_value_set(parameter: &str, given: String, slot: &mut String) -> Option<PsError> {
+    let sets = value_sets();
+    let set = sets.iter().find(|(name, _)| name.eq_ignore_ascii_case(parameter)).map(|(_, set)| set.as_slice()).unwrap_or(&[]);
+    if set.iter().any(|allowed| allowed.eq_ignore_ascii_case(&given)) {
+        *slot = given;
+        return None;
+    }
+    Some(set_refusal(parameter, &given, set))
+}
+
+/// The error Write-ColorEX gives for a style's parameters splatted to it, as PSWriteColorEX's
+/// Show-ColorTable -Profiles and Write-Color* helpers splat them, as one that does not stop the
+/// caller; none when it takes them. Binding refuses a value outside its set first, in PowerShell's
+/// words, then an entry of -Color, -BackGroundColor or -UnderlineColor that is not a color, each
+/// value read as an array as binding reads it.
+pub fn splat_refusal(params: &PsHashtable) -> PsResult<Option<PsError>> {
+    let keys = params.keys()?;
+    let value = |name: &str| -> PsResult<Option<PsObject>> {
+        match keys.iter().find(|key| key.eq_ignore_ascii_case(name)) {
+            Some(key) => Ok(Some(params.get(key)?)),
+            None => Ok(None),
+        }
+    };
+    for (name, set) in value_sets() {
+        let Some(given) = value(name)? else { continue };
+        let text = if given.is_null() { String::new() } else { String::from_ps(&given)? };
+        if !set.iter().any(|allowed| allowed.eq_ignore_ascii_case(&text)) {
+            return Ok(Some(set_refusal(name, &text, &set)));
+        }
+    }
+    for name in ["Color", "BackGroundColor", "UnderlineColor"] {
+        let Some(given) = value(name)? else { continue };
+        let entries = if !given.is_null() && is_list(&given)? { Vec::<PsObject>::from_ps(&given)? } else { vec![given] };
+        if let Err(mut error) = color_list(&entries, name) {
+            error.terminating = false;
+            return Ok(Some(error));
+        }
+    }
+    Ok(None)
 }
 
 /// The folder of the script that called the command, or nothing at the prompt.

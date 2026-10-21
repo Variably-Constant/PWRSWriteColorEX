@@ -2,7 +2,7 @@
 
 BeforeDiscovery {
     # Each case: a name, the code points of the text, its width, and its width with -AmbiguousAsWide
-    $widthCases = @(
+    $script:widthCases = @(
         @{ Name = 'printable ASCII'; CodePoints = @(0x48, 0x65, 0x6C, 0x6C, 0x6F); Width = 5; WideWidth = 5 }
         @{ Name = 'CJK characters'; CodePoints = @(0x4E16, 0x754C); Width = 4; WideWidth = 4 }
         @{ Name = 'check mark U+2713'; CodePoints = @(0x2713); Width = 1; WideWidth = 1 }
@@ -45,7 +45,7 @@ Describe 'Color conversions' -Tag 'Conversion' {
         Convert-HexToRGB 'ff8000' | Should -Be @(255, 128, 0)
     }
 
-    It 'answers gray with a warning for an invalid code' {
+    It 'returns gray with a warning for an invalid code' {
         $rgb = Convert-HexToRGB 'nope' -WarningVariable warnings -WarningAction SilentlyContinue
         $rgb | Should -Be @(128, 128, 128)
         $warnings | Should -Be 'Invalid hex color format: nope. Expected format: #RRGGBB or RRGGBB'
@@ -90,43 +90,84 @@ Describe 'Color conversions' -Tag 'Conversion' {
         { Get-LighterANSI8Color 300 -ErrorAction Stop } | Should -Throw
     }
 
-    It 'answers to the Lighten-* names' {
+    It 'works under the Lighten-* names' {
         Lighten-ColorName 'DarkBlue' | Should -Be 'Blue'
         LA8 1 | Should -Be 9
     }
 }
 
+Describe 'Get-ColorContrast' -Tag 'Conversion' {
+    It 'returns the WCAG contrast ratio, from 1 to 21' {
+        $ratio = Get-ColorContrast White Black
+        $ratio | Should -BeOfType [double]
+        [Math]::Abs($ratio - 21) | Should -BeLessThan 1e-12
+        Get-ColorContrast Crimson Crimson | Should -Be 1
+        [Math]::Abs((Get-ColorContrast Red White) - 3.998) | Should -BeLessThan 0.001
+        [Math]::Abs((Get-ColorContrast @(229, 229, 229) Black) - 16.67) | Should -BeLessThan 0.01
+    }
+
+    It 'gives the same ratio either way round' {
+        $one = Get-ColorContrast Gold '#1E1E2E'
+        $two = Get-ColorContrast '#1E1E2E' Gold
+        [BitConverter]::DoubleToInt64Bits($one) | Should -Be ([BitConverter]::DoubleToInt64Bits($two))
+    }
+
+    It 'takes a color in each form Register-ColorName takes' {
+        $expected = Get-ColorContrast @(255, 128, 0) @(0, 0, 128)
+        Get-ColorContrast '#FF8000' Navy | Should -Be $expected
+        Get-ColorContrast 'rgb(255, 128, 0)' '#000080' | Should -Be $expected
+        Get-ColorContrast 'hsl(30, 100%, 50%)' 'rgb(0, 0, 128)' | Should -Be $expected
+        Get-ColorContrast '#F80' Navy | Should -Be (Get-ColorContrast @(255, 136, 0) Navy)
+        Register-ColorName Brand '#FF8000'
+        try {
+            Get-ColourContrast -C Brand -BGC Navy | Should -Be $expected
+        } finally {
+            Unregister-ColorName Brand
+        }
+    }
+
+    It 'gives an error and no ratio for a value that is not a color' {
+        $ratio = Get-ColorContrast NoSuchColor White -ErrorVariable failures -ErrorAction SilentlyContinue
+        $ratio | Should -BeNullOrEmpty
+        $failures.Count | Should -Be 1
+        $failures[0].FullyQualifiedErrorId | Should -BeLike 'InvalidColor*'
+        $failures[0].Exception.Message | Should -Be "'NoSuchColor' is not a color. A color is a hex code, rgb(), hsl(), an RGB array of three numbers 0-255, or a name in the color table."
+        $null = Get-ColorContrast @(1, 2) @(256, 0, 0) -ErrorVariable both -ErrorAction SilentlyContinue
+        @($both | ForEach-Object { $_.Exception.Message.Split(' ')[0] }) | Should -Be @("'@(1,", "'@(256,")
+    }
+}
+
 Describe 'Get-ColorTableWithRGB' -Tag 'Conversion' {
     BeforeAll {
-        $table = Get-ColorTableWithRGB
+        $script:table = Get-ColorTableWithRGB
     }
 
     It 'holds 129 color names' {
-        $table | Should -BeOfType [hashtable]
-        $table.Count | Should -Be 129
+        $script:table | Should -BeOfType [hashtable]
+        $script:table.Count | Should -Be 129
     }
 
     It 'finds a name without regard to case' {
-        $table['ORANGE'][3] | Should -Be 208
+        $script:table['ORANGE'][3] | Should -Be 214
     }
 
     It 'holds each color in every mode' {
-        $entry = $table['DarkRed']
+        $entry = $script:table['DarkRed']
         $entry[0] | Should -Be 'DarkRed'
         $entry[1] | Should -Be 31
         $entry[2] | Should -Be 41
-        $entry[3] | Should -Be 52
+        $entry[3] | Should -Be 88
         $entry[4] | Should -Be @(139, 0, 0)
         $entry[1] | Should -BeOfType [int]
     }
 }
 
 Describe 'Measure-DisplayWidth' -Tag 'Conversion' {
-    It 'measures <Name> as <Width> cells' -TestCases $widthCases {
+    It 'measures <Name> as <Width> cells' -TestCases $script:widthCases {
         Measure-DisplayWidth -Text (ConvertTo-TestString $CodePoints) | Should -Be $Width
     }
 
-    It 'measures <Name> as <WideWidth> cells with -AmbiguousAsWide' -TestCases $widthCases {
+    It 'measures <Name> as <WideWidth> cells with -AmbiguousAsWide' -TestCases $script:widthCases {
         Measure-DisplayWidth -Text (ConvertTo-TestString $CodePoints) -AmbiguousAsWide | Should -Be $WideWidth
     }
 
@@ -141,15 +182,15 @@ Describe 'Measure-DisplayWidth' -Tag 'Conversion' {
 
 Describe 'Test-AnsiSupport' -Tag 'Conversion' {
     BeforeAll {
-        $saved = Save-ColorEnvironment
+        $script:saved = Save-ColorEnvironment
     }
 
     AfterAll {
-        Restore-ColorEnvironment $saved
+        Restore-ColorEnvironment $script:saved
         Import-PWRSWriteColorEX
     }
 
-    It 'answers <Expected> with <Name>' -TestCases @(
+    It 'returns <Expected> for <Name>' -TestCases @(
         @{ Name = 'FORCE_COLOR=3'; Values = @{ FORCE_COLOR = '3' }; Expected = 'TrueColor' }
         @{ Name = 'FORCE_COLOR=2'; Values = @{ FORCE_COLOR = '2' }; Expected = 'ANSI8' }
         @{ Name = 'FORCE_COLOR=1'; Values = @{ FORCE_COLOR = '1' }; Expected = 'ANSI4' }
@@ -160,9 +201,10 @@ Describe 'Test-AnsiSupport' -Tag 'Conversion' {
         (Test-AnsiSupport -Silent).ColorSupport | Should -Be $Expected
     }
 
-    It 'answers the shape PSWriteColorEX answers' {
+    It 'returns the shape PSWriteColorEX returns' {
         $result = Test-AnsiSupport -Silent
-        @($result.PSObject.Properties.Name) | Should -Be @('ColorSupport', 'SupportsBoldFonts', 'Details')
+        @($result.PSObject.Properties.Name) | Should -Be @('ColorSupport', 'SupportsBoldFonts', 'SupportsUnicode', 'Details')
+        $result.SupportsUnicode | Should -BeOfType [bool]
         $result.Details.OperatingSystem | Should -BeOfType [System.PlatformID]
         $result.Details.PowerShellVersion | Should -Be $PSVersionTable.PSVersion.ToString()
         $result.Details.StyleSupport | Should -BeOfType [hashtable]

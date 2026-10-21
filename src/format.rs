@@ -1,26 +1,29 @@
 //! Format-ColorEX: Write-ColorEX's text, color, style and width parameters, with each line
-//! answered as a string instead of written to the host, as PSWriteColorEX's.
+//! returned as a string instead of written to the host, as PSWriteColorEX's.
 
 use std::collections::HashSet;
 
 use pwrs::prelude::*;
 
+use crate::detect::Support;
 use crate::write::{begin_checks, caller_script_root, color_parameter, gradient_list, render, style_argument, WriteOptions};
 
-/// Answers text with its colors and styles as escape codes, as Write-ColorEX would write it.
+/// Returns text with its colors and styles as escape codes, as Write-ColorEX would write it.
 ///
-/// Format-ColorEX takes Write-ColorEX's text, color, style and width parameters and answers each
+/// Format-ColorEX takes Write-ColorEX's text, color, style and width parameters and returns each
 /// line as a string instead of writing it to the host, for a string built from several pieces, a
 /// table column, a file or another command. The strings hold escape codes wherever the host shows
 /// them, by the same detection and color variables Write-ColorEX uses. Where it would write
-/// console colors instead, or with colors turned off, the strings are the text alone. -Wrap
-/// answers one string per line, and a style profile's -LinesBefore and -LinesAfter answer empty
-/// strings.
+/// console colors instead, or with colors turned off, the strings are the text alone.
+/// -ColorSupport gives the color support to format for in place of the detection and the color
+/// variables, so the strings are the same wherever they are made. -Wrap returns one string per
+/// line, and a style profile's -LinesBefore and -LinesAfter return empty strings.
 ///
 /// # Examples
 /// $status = Format-ColorEX -Text 'OK' -Color Green -Bold
 /// "Result: $status"
 /// Format-ColorEX -Text '[red]x[/] failed' -Markup
+/// Format-ColorEX -Text 'Done' -Color Green -ColorSupport ANSI8
 #[cmdlet(verb = "Format", noun = "ColorEX", alias = ["Format-ColourEX", "FCEX"], output = ["System.String"])]
 #[derive(Default)]
 #[allow(non_snake_case)]
@@ -42,9 +45,32 @@ pub struct FormatColorEX {
     /// takes them.
     #[param(alias = ["BGGrad"])]
     pub back_ground_gradient: Option<Vec<PsObject>>,
-    /// How the gradients blend their colors: OKLab (the default) or RGB.
-    #[param(validate_set = ["OKLab", "RGB"])]
+    /// How the gradients blend their colors: OKLab (the default), RGB, LinearRGB, OKLCH, HSL, HSV,
+    /// Lab or LCh, as Write-ColorEX's -GradientSpace takes them.
+    #[param(validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"])]
     pub gradient_space: Option<String>,
+    /// The way round the hue wheel in OKLCH, HSL, HSV and LCh: Shorter (the default), Longer,
+    /// Increasing or Decreasing.
+    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"])]
+    pub gradient_hue: Option<String>,
+    /// A curve that moves the colors along the text, as Write-ColorEX's -GradientEasing takes it.
+    #[param(validate_set = [
+        "Linear", "InSine", "OutSine", "InOutSine", "InQuad", "OutQuad", "InOutQuad", "InCubic", "OutCubic", "InOutCubic", "InQuart", "OutQuart",
+        "InOutQuart", "InQuint", "OutQuint", "InOutQuint", "InExpo", "OutExpo", "InOutExpo", "InCirc", "OutCirc", "InOutCirc", "InBack", "OutBack",
+        "InOutBack", "InElastic", "OutElastic", "InOutElastic", "InBounce", "OutBounce", "InOutBounce"
+    ])]
+    pub gradient_easing: Option<String>,
+    /// What a gradient does past placed first and last colors: None (the default), Repeat or
+    /// Mirror.
+    #[param(validate_set = ["None", "Repeat", "Mirror"])]
+    pub gradient_repeat: Option<String>,
+    /// The way a gradient runs across the text: Forward (the default), Reverse, CenterOut or
+    /// EdgesIn.
+    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"])]
+    pub gradient_direction: Option<String>,
+    /// Cuts a gradient into this many bands of solid color; 0, the default, blends smoothly.
+    #[param(validate_range(0, 2147483647))]
+    pub gradient_steps: i32,
     /// Uses ANSI 4-bit colors.
     #[param(alias = ["A4"])]
     pub ANSI4: bool,
@@ -54,6 +80,11 @@ pub struct FormatColorEX {
     /// Uses 24-bit TrueColor.
     #[param(alias = ["A24", "TrueColor", "TC"])]
     pub ANSI24: bool,
+    /// The color support to format for, in place of the detection and the color variables: None,
+    /// ANSI4, ANSI8 or TrueColor, as Write-ColorEX's -ColorSupport takes it. ANSI4, ANSI8 and
+    /// TrueColor give escape codes for that support, and None gives the text alone.
+    #[param(validate_set = ["None", "ANSI4", "ANSI8", "TrueColor"])]
+    pub color_support: Option<String>,
     /// The styles of each segment, as Write-ColorEX's -Style takes them.
     #[param(alias = ["S"])]
     pub style: Option<PsObject>,
@@ -148,10 +179,10 @@ pub struct FormatColorEX {
 
 /// The parameter names of Format-ColorEX that Write-ColorEX takes too, for which ones a call gave.
 const PARAMETER_NAMES: &[&str] = &[
-    "Color", "BackGroundColor", "Gradient", "BackGroundGradient", "GradientSpace", "ANSI4", "ANSI8", "ANSI24", "Style", "StyleProfile", "Default", "Bold",
-    "Faint", "Italic", "Underline", "Blink", "CrossedOut", "DoubleUnderline", "Overline", "Reverse", "UnderlineColor", "UnderlineStyle", "Markup", "Split",
-    "SplitAround", "SplitEvenly", "Highlight", "Link", "StartTab", "StartSpaces", "AutoPad", "PadLeft", "PadCenter", "PadChar", "Truncate", "Wrap",
-    "Debugging", "Silent",
+    "Color", "BackGroundColor", "Gradient", "BackGroundGradient", "GradientSpace", "GradientHue", "GradientEasing", "GradientRepeat", "GradientDirection",
+    "GradientSteps", "ANSI4", "ANSI8", "ANSI24", "ColorSupport", "Style", "StyleProfile", "Default", "Bold", "Faint", "Italic", "Underline", "Blink", "CrossedOut",
+    "DoubleUnderline", "Overline", "Reverse", "UnderlineColor", "UnderlineStyle", "Markup", "Split", "SplitAround", "SplitEvenly", "Highlight", "Link",
+    "StartTab", "StartSpaces", "AutoPad", "PadLeft", "PadCenter", "PadChar", "Truncate", "Wrap", "Debugging", "Silent",
 ];
 
 impl Cmdlet for FormatColorEX {
@@ -159,6 +190,7 @@ impl Cmdlet for FormatColorEX {
         // Write-ColorEX's checks run for each string, as each string is a call of its own
         let highlight = begin_checks(
             ps,
+            self.style.as_ref(),
             [
                 (self.color.as_ref(), "Color"),
                 (self.back_ground_color.as_ref(), "BackGroundColor"),
@@ -188,9 +220,15 @@ impl Cmdlet for FormatColorEX {
                 None => None,
             },
             gradient_space: self.gradient_space.clone().unwrap_or_else(|| "OKLab".to_string()),
+            gradient_hue: self.gradient_hue.clone().unwrap_or_else(|| "Shorter".to_string()),
+            gradient_easing: self.gradient_easing.clone().unwrap_or_else(|| "Linear".to_string()),
+            gradient_repeat: self.gradient_repeat.clone().unwrap_or_else(|| "None".to_string()),
+            gradient_direction: self.gradient_direction.clone().unwrap_or_else(|| "Forward".to_string()),
+            gradient_steps: self.gradient_steps,
             ansi4: self.ANSI4,
             ansi8: self.ANSI8,
             ansi24: self.ANSI24,
+            color_support: self.color_support.as_deref().and_then(Support::from_name),
             style: style_argument(self.style.as_ref())?,
             style_profile: self.style_profile.clone().filter(|p| !p.is_null()),
             default: self.default,

@@ -1,6 +1,6 @@
 [package]
 name = "pwrs-write-color-ex"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["Mark Newton"]
 edition = "2024"
 rust-version = "1.98"
@@ -27,27 +27,43 @@ publish = false
 company = "Variably Constant"
 copyright = "(c) 2026 Mark Newton"
 license-uri = "https://github.com/Variably-Constant/PWRSWriteColorEX/blob/main/LICENSE"
-release-notes = """The first release of PWRSWriteColorEX: the commands of PSWriteColorEX 1.2.0 written \
-in Rust with PWRS, with the same names, parameters, aliases, PSColorStyle class and output, markup tags, \
--Split, -Highlight, -Link, OKLab gradients, -Wrap and -Truncate among them, for Windows x64 and arm64, \
-Linux x64 and arm64, macOS arm64 and x64, and FreeBSD x64. It imports in PowerShell 7.4 or later and \
-Windows PowerShell 5.1, and its version follows PSWriteColorEX's. The full list is in CHANGELOG.md: \
-https://github.com/Variably-Constant/PWRSWriteColorEX/blob/main/CHANGELOG.md"""
+release-notes = """The commands, parameters and output of PSWriteColorEX 1.2.1: twenty-one named gradients; \
+gradients in eight color spaces with hue paths, placed stops, easing, bands, repeats and directions, and \
+Get-GradientColor; -ColorSupport on Write-ColorEX and Format-ColorEX, in place of the color detection; \
+Test-AnsiSupport's SupportsUnicode, with WRITECOLOREX_UNICODE to set it; Get-ColorContrast; \
+Import-ColorProfile -Theme with twelve color themes, PowerShell's own colors and the CSS color names; \
+Show-ColorTable -Styles, -Palette and -Profiles; the about_PWRSWriteColorEX cheat sheet; 256 colors \
+written as the code that looks nearest; every gradient stop drawn; -Style refusing what PSWriteColorEX \
+refuses; and an import keeping the style profiles added since, as PSWriteColorEX's does. Each write to the \
+host goes through PWRS's Pipeline::write_host, one call into .NET. The full \
+list is in CHANGELOG.md: https://github.com/Variably-Constant/PWRSWriteColorEX/blob/main/CHANGELOG.md"""
 
-# The module's native library.
+# The module's native library, and a Rust library another PWRS module can link.
 [lib]
 name = "pwrs_write_color_ex"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+# The doc comments hold PowerShell, not Rust examples.
+doctest = false
+
+# `module` exports the PowerShell module: export_module! and the import hook. A
+# crate that links the library depends on it with default-features = false, so
+# it carries none of the module's exports.
+[features]
+default = ["module"]
+module = []
 
 [dependencies]
 # The binding framework, published on crates.io as PoWerRuSt, since crates.io
 # carries an unrelated `pwrs`; the library it builds is still `pwrs`, which is
 # what the source writes. cargo-pwrs builds the module and takes the same
 # version.
-pwrs = { package = "PoWerRuSt", version = "0.5.0" }
+pwrs = { package = "PoWerRuSt", version = "0.7.0" }
 # Display width of each code point, the table PSWriteColorEX's Measure-DisplayWidth
 # is generated from, so both modules measure text alike.
 unicode-width = "=0.2.2"
+# SwapCell, from the SubEtha IPC stack's core: the registered color names, which any
+# thread reads without waiting while a change swaps in a new table.
+subetha-core = "0.6.0"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

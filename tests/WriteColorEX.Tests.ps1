@@ -4,16 +4,16 @@
 # elsewhere, as Write-Host writes it.
 
 BeforeDiscovery {
-    $composes = $PSVersionTable.PSVersion -ge [version]'7.2' -and $Host.UI.SupportsVirtualTerminal
+    $script:composes = $PSVersionTable.PSVersion -ge [version]'7.2' -and $Host.UI.SupportsVirtualTerminal -and $PSStyle.OutputRendering -ne 'PlainText'
 }
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'Common.ps1')
-    $saved = Save-ColorEnvironment
+    $script:saved = Save-ColorEnvironment
 }
 
 AfterAll {
-    Restore-ColorEnvironment $saved
+    Restore-ColorEnvironment $script:saved
     Import-PWRSWriteColorEX
 }
 
@@ -240,13 +240,13 @@ Describe 'Write-ColorEX console colors' -Tag 'Output' {
         Set-ColorEnvironment @{}
     }
 
-    It 'writes a line of console colors in one call with escape codes' -Skip:(-not $composes) {
+    It 'writes a line of console colors in one call with escape codes' -Skip:(-not $script:composes) {
         $writes = @(Get-HostWrite { Write-ColorEX -Text 'a', 'b' -Color Red, Green })
         $writes.Count | Should -Be 1
         $writes[0].Text | Should -Be "$esc[91ma$esc[0m$esc[92mb$esc[0m"
     }
 
-    It 'writes one call per color with the line end on the last' -Skip:$composes {
+    It 'writes one call per color with the line end on the last' -Skip:$script:composes {
         $writes = @(Get-HostWrite { Write-ColorEX -Text 'a', 'b' -Color Red, Green })
         @($writes | ForEach-Object Text) | Should -Be @('a', 'b')
         @($writes | ForEach-Object { "$($_.ForegroundColor)" }) | Should -Be @('Red', 'Green')

@@ -31,6 +31,7 @@ function Get-HostWrite {
 
 # Removes escape codes, to compare the text alone.
 function Remove-EscapeCode {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'It returns the text without its escape codes and changes nothing.')]
     param([string]$Text)
     $Text -replace "$([char]27)\[[0-9;]*m", ''
 }
@@ -51,6 +52,7 @@ $script:colorVariables = @(
 # Write-ColorEX write ANSI4, ANSI8 and TrueColor whatever the terminal, NO_COLOR and TERM=dumb
 # turn colors off. The module is imported again so its detection reads the new values.
 function Set-ColorEnvironment {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'A test helper that sets the test session''s color variables, where -WhatIf has no meaning.')]
     param([hashtable]$Values = @{})
     foreach ($name in $script:colorVariables) {
         [System.Environment]::SetEnvironmentVariable($name, $null)

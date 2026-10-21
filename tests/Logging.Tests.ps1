@@ -1,7 +1,7 @@
 # The log file -LogFile writes: where it goes, what each line holds, and its bytes in each encoding.
 
 BeforeDiscovery {
-    $encodingCases = @(
+    $script:encodingCases = @(
         @{ Encoding = 'utf8'; Bytes = 'C3-A9' }
         @{ Encoding = 'utf8NoBOM'; Bytes = 'C3-A9' }
         @{ Encoding = 'default'; Bytes = 'C3-A9' }
@@ -18,8 +18,8 @@ BeforeDiscovery {
 BeforeAll {
     . (Join-Path $PSScriptRoot 'Common.ps1')
     Import-PWRSWriteColorEX
-    $eAcute = [string][char]0xE9
-    $newLine = [System.Environment]::NewLine
+    $script:eAcute = [string][char]0xE9
+    $script:newLine = [System.Environment]::NewLine
 }
 
 Describe 'Write-ColorEX -LogFile' -Tag 'Logging' {
@@ -28,8 +28,8 @@ Describe 'Write-ColorEX -LogFile' -Tag 'Logging' {
         $null = New-Item -ItemType Directory -Path $folder
     }
 
-    It 'writes <Encoding> as <Bytes>' -TestCases $encodingCases {
-        Write-ColorEX -Text $eAcute -LogFile 'e.log' -LogPath $folder -Encoding $Encoding -NoNewLine -NoConsoleOutput
+    It 'writes <Encoding> as <Bytes>' -TestCases $script:encodingCases {
+        Write-ColorEX -Text $script:eAcute -LogFile 'e.log' -LogPath $folder -Encoding $Encoding -NoNewLine -NoConsoleOutput
         [BitConverter]::ToString([IO.File]::ReadAllBytes((Join-Path $folder 'e.log'))) | Should -Be $Bytes
     }
 
@@ -39,12 +39,12 @@ Describe 'Write-ColorEX -LogFile' -Tag 'Logging' {
         $bytes = [IO.File]::ReadAllBytes((Join-Path $folder 'bom.log'))
         $text = [Text.Encoding]::UTF8.GetString($bytes, 3, $bytes.Length - 3)
         [BitConverter]::ToString($bytes, 0, 3) | Should -Be 'EF-BB-BF'
-        $text | Should -Be "a$($newLine)b$newLine"
+        $text | Should -Be "a$($script:newLine)b$($script:newLine)"
     }
 
     It 'writes the segments as one line, with the time and level before them' {
         Write-ColorEX -Text 'a', 'b' -LogFile 'line.log' -LogPath $folder -LogTime -DateTimeFormat "'T'" -LogLevel 'INFO' -NoConsoleOutput
-        [IO.File]::ReadAllText((Join-Path $folder 'line.log')) | Should -Be "[T][INFO] ab$newLine"
+        [IO.File]::ReadAllText((Join-Path $folder 'line.log')) | Should -Be "[T][INFO] ab$($script:newLine)"
     }
 
     It 'adds .log to a name without an extension' {
@@ -86,6 +86,6 @@ Describe 'Write-ColorEX -LogFile' -Tag 'Logging' {
 
     It 'logs the padding -AutoPad adds' {
         Write-ColorEX -Text 'ab' -AutoPad 5 -LogFile 'pad.log' -LogPath $folder -NoConsoleOutput
-        [IO.File]::ReadAllText((Join-Path $folder 'pad.log')) | Should -Be "ab   $newLine"
+        [IO.File]::ReadAllText((Join-Path $folder 'pad.log')) | Should -Be "ab   $($script:newLine)"
     }
 }

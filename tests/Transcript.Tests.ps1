@@ -4,13 +4,13 @@
 # records a line of several colors as one line per color.
 
 BeforeDiscovery {
-    $composesLines = $PSVersionTable.PSVersion -ge [version]'7.2' -and $Host.UI.SupportsVirtualTerminal
-    $isDesktop = $PSVersionTable.PSEdition -eq 'Desktop'
+    $script:composesLines = $PSVersionTable.PSVersion -ge [version]'7.2' -and $Host.UI.SupportsVirtualTerminal -and $PSStyle.OutputRendering -ne 'PlainText'
+    $script:isDesktop = $PSVersionTable.PSEdition -eq 'Desktop'
 }
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'Common.ps1')
-    $saved = Save-ColorEnvironment
+    $script:saved = Save-ColorEnvironment
     Set-ColorEnvironment @{}
 
     # The lines a transcript recorded between its header and its footer
@@ -25,7 +25,7 @@ BeforeAll {
 }
 
 AfterAll {
-    Restore-ColorEnvironment $saved
+    Restore-ColorEnvironment $script:saved
     Import-PWRSWriteColorEX
 }
 
@@ -45,7 +45,7 @@ Describe 'Write-ColorEX in a transcript' -Tag 'Transcript' {
         $body | Should -Be @('first', 'second', '', '', 'third')
     }
 
-    It 'records a line of several colors as one line' -Skip:(-not $composesLines) {
+    It 'records a line of several colors as one line' -Skip:(-not $script:composesLines) {
         $path = Join-Path $TestDrive 'several-colors.txt'
         $null = Start-Transcript -Path $path
         try {
@@ -59,7 +59,7 @@ Describe 'Write-ColorEX in a transcript' -Tag 'Transcript' {
         Get-TranscriptBody -Path $path | Should -Be @(' - Consumer- Count: 55', '   - Sum: 1000', '    indented')
     }
 
-    It 'records each color as a line of its own, with no escape codes, in Windows PowerShell 5.1' -Skip:(-not $isDesktop) {
+    It 'records each color as a line of its own, with no escape codes, in Windows PowerShell 5.1' -Skip:(-not $script:isDesktop) {
         $path = Join-Path $TestDrive 'desktop.txt'
         $null = Start-Transcript -Path $path
         try {

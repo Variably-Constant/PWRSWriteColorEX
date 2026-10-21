@@ -21,7 +21,7 @@ struct Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-    /// Skips white space; answers how many characters it skipped.
+    /// Skips white space; returns how many characters it skipped.
     fn spaces(&mut self) -> usize {
         let trimmed = self.rest.trim_start_matches(is_white_space);
         let skipped = self.rest[..self.rest.len() - trimmed.len()].chars().count();
@@ -170,7 +170,7 @@ fn hsl_values(value: &str) -> Option<[f64; 3]> {
 }
 
 /// A color as Write-ColorEX reads it further on: '#RGB', '0xRGB', 'rgb(r, g, b)' and
-/// 'hsl(h, s%, l%)' become '#RRGGBB'; any other text is answered as it is. A channel of rgb()
+/// 'hsl(h, s%, l%)' become '#RRGGBB'; any other text is returned as it is. A channel of rgb()
 /// outside 0-255 is clamped, with a warning `warn` gets.
 pub fn color_form(value: &str, warn: &mut dyn FnMut(String)) -> String {
     if let Some(hex) = short_hex(value) {

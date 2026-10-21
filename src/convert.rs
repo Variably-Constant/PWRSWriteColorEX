@@ -1,9 +1,12 @@
 //! The color conversion cmdlets: hex codes to RGB values, RGB values to ANSI codes, the color
-//! table, and lighter forms of a color.
+//! table, lighter forms of a color, and the contrast of two colors.
 
 use pwrs::prelude::*;
 
 use crate::colors;
+use crate::names::register_rgb;
+use crate::oklab;
+use crate::write::ColorArg;
 
 /// A channel of an RGB array as PowerShell reads a missing one: 0.
 fn channel(rgb: &[i32], index: usize) -> i64 {
@@ -45,9 +48,11 @@ impl Cmdlet for ConvertHexToRGB {
 
 /// Converts RGB values to the nearest ANSI 256-color code.
 ///
-/// A color whose channels are within 10 of each other maps to the 24 grays (232-255), or to 16
-/// (black) and 231 (white) at the ends. Any other color maps to the 6x6x6 color cube (16-231).
-/// Values outside 0-255 are clamped.
+/// Finds the 256-color code that looks nearest to an RGB color: the code at the least distance in
+/// OKLab, a color space whose distances follow how different two colors look. The codes are the
+/// 6x6x6 color cube (16-231) and the 24 grays (232-255); codes 0-15 are left out, since the
+/// terminal's scheme sets their colors. Of two codes as near, it returns the lower. Values outside
+/// 0-255 are clamped.
 ///
 /// # Examples
 /// Convert-RGBToANSI8 @(255, 128, 0)
@@ -68,7 +73,7 @@ impl Cmdlet for ConvertRGBToANSI8 {
 
 /// Converts RGB values to the nearest ANSI 16-color foreground code.
 ///
-/// Answers 30-37 for the normal colors and 90-97 for the bright ones, by the strongest channel
+/// Returns 30-37 for the normal colors and 90-97 for the bright ones, by the strongest channel
 /// and whether it reaches 200. Grays map to black, dark gray, gray or white by brightness.
 ///
 /// # Examples
@@ -192,5 +197,63 @@ pub struct GetLighterANSI8Color {
 impl Cmdlet for GetLighterANSI8Color {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
         ps.write(int32(colors::lighter_ansi8(i64::from(self.ANSI8Code), self.factor.unwrap_or(1.4))))
+    }
+}
+
+/// A value given as a color, as an error names it: an array as @(...), anything else as text.
+fn shown_color(color: &PsObject) -> PsResult<String> {
+    Ok(match ColorArg::from_object(color)? {
+        Some(ColorArg::List(items)) => format!("@({})", items.iter().map(ColorArg::display).collect::<Vec<_>>().join(", ")),
+        _ if color.is_null() => String::new(),
+        _ => String::from_ps(color)?,
+    })
+}
+
+/// Gets the contrast ratio of two colors.
+///
+/// Returns the contrast ratio WCAG 2 defines for text in one color on a background in another:
+/// (L1 + 0.05) / (L2 + 0.05), L1 being the relative luminance of the lighter color and L2 of the
+/// darker. It runs from 1, for two colors of the same luminance, to 21 for black and white, and is
+/// the same either way round. WCAG asks for at least 4.5 for body text and 3 for large text.
+/// Windows PowerShell 5.1, PowerShell 7 and PSWriteColorEX return the same ratio to the last bit.
+/// A value that is not a color gives an error and no ratio.
+///
+/// # Examples
+/// Get-ColorContrast -Color White -BackGroundColor '#1E1E2E'
+/// if ((Get-ColorContrast Gold $background) -lt 4.5) { $text = 'Black' }
+#[cmdlet(verb = "Get", noun = "ColorContrast", alias = ["Get-ColourContrast"], output = ["System.Double"])]
+#[derive(Default)]
+pub struct GetColorContrast {
+    /// The text color: a hex code ('#FF8000', '#F80'), 'rgb(255, 128, 0)', 'hsl(30, 100%, 50%)', an
+    /// RGB array @(255, 128, 0), or a name in the color table.
+    #[param(mandatory, position = 0, alias = ["C", "ForegroundColor", "FGC"])]
+    pub color: PsObject,
+    /// The background color, in the same forms as -Color.
+    #[param(mandatory, position = 1, alias = ["B", "BGC"])]
+    pub back_ground_color: PsObject,
+}
+
+impl Cmdlet for GetColorContrast {
+    fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let mut warnings = Vec::new();
+        let foreground = register_rgb(&self.color, &mut |message| warnings.push(message))?;
+        let background = register_rgb(&self.back_ground_color, &mut |message| warnings.push(message))?;
+        for message in &warnings {
+            ps.warning(message)?;
+        }
+        for (value, rgb) in [(&self.color, foreground), (&self.back_ground_color, background)] {
+            if rgb.is_none() {
+                ps.write_error(
+                    &PsError::new(
+                        ErrorCategory::InvalidArgument,
+                        "InvalidColor",
+                        format!("'{}' is not a color. A color is a hex code, rgb(), hsl(), an RGB array of three numbers 0-255, or a name in the color table.", shown_color(value)?),
+                    )
+                    .with_target(value.clone()),
+                )?;
+            }
+        }
+        let (Some(foreground), Some(background)) = (foreground, background) else { return Ok(()) };
+        ps.write(oklab::contrast_ratio(foreground.map(i64::from), background.map(i64::from)))
     }
 }
