@@ -37,6 +37,48 @@ BeforeAll {
         }
     }
 
+    # The parameters of a module's commands that take $null, an empty string or an empty array, or
+    # wildcards, as text: one line for each such parameter, with its AllowNull, AllowEmptyString,
+    # AllowEmptyCollection and SupportsWildcards attributes. Names sort ordinally.
+    function Get-ParameterMarks {
+        param([Parameter(Mandatory)][string]$Module)
+        $marks = 'AllowNullAttribute', 'AllowEmptyStringAttribute', 'AllowEmptyCollectionAttribute', 'SupportsWildcardsAttribute'
+        $common = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
+        $commands = @(Get-Command -Module $Module -CommandType Function, Cmdlet)
+        $names = [string[]]@($commands | ForEach-Object Name)
+        [Array]::Sort($names, [StringComparer]::Ordinal)
+        foreach ($name in $names) {
+            $command = $commands | Where-Object Name -EQ $name
+            $parameters = [string[]]@($command.Parameters.Keys | Where-Object { $common -notcontains $_ })
+            [Array]::Sort($parameters, [StringComparer]::Ordinal)
+            foreach ($parameter in $parameters) {
+                $found = [string[]]@($command.Parameters[$parameter].Attributes | ForEach-Object { $_.GetType().Name } | Where-Object { $marks -contains $_ } | ForEach-Object { $_ -replace 'Attribute$' })
+                if ($found.Count) {
+                    [Array]::Sort($found, [StringComparer]::Ordinal)
+                    "$name -$parameter $($found -join ',')"
+                }
+            }
+        }
+    }
+
+    # The default value Get-Help gives each parameter of a module's commands, as text: one line for
+    # each parameter, blank where the help gives none. Names sort ordinally.
+    function Get-HelpDefaults {
+        param([Parameter(Mandatory)][string]$Module)
+        $common = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
+        $commands = @(Get-Command -Module $Module -CommandType Function, Cmdlet)
+        $names = [string[]]@($commands | ForEach-Object Name)
+        [Array]::Sort($names, [StringComparer]::Ordinal)
+        foreach ($name in $names) {
+            $command = $commands | Where-Object Name -EQ $name
+            $parameters = [string[]]@($command.Parameters.Keys | Where-Object { $common -notcontains $_ })
+            [Array]::Sort($parameters, [StringComparer]::Ordinal)
+            foreach ($parameter in $parameters) {
+                "$name -$parameter default=[$((Get-Help $name -Parameter $parameter).defaultValue)]"
+            }
+        }
+    }
+
     # The members of [PSColorStyle] as text: its instance members, its static members and its
     # constructors.
     function Get-ClassSurface {
@@ -299,6 +341,243 @@ Write-ColorWarning aliases=[WCW,WCWarn,WWarning,Write-ColourWarning,Write-Warnin
   PassThru type=SwitchParameter position=- mandatory=False pipeline=False aliases=[] values=[] range=[] sets=[__AllParameterSets]
 '@
         (Get-CommandSurface -Module 'PWRSWriteColorEX') -join "`n" | Should -BeExactly ($expected -replace "`r", '')
+    }
+
+    It 'has the same parameters taking $null, empty values and wildcards' {
+        $expected = @'
+Export-ColorProfile -Name SupportsWildcards
+Format-ColorEX -BackGroundGradient AllowNull
+Format-ColorEX -Gradient AllowNull
+Measure-DisplayWidth -Text AllowEmptyString
+Show-ColorTable -Name SupportsWildcards
+Write-ColorEX -BackGroundGradient AllowNull
+Write-ColorEX -Gradient AllowNull
+'@
+        (Get-ParameterMarks -Module 'PWRSWriteColorEX') -join "`n" | Should -BeExactly ($expected -replace "`r", '')
+    }
+
+    It 'gives each parameter the default value PSWriteColorEX''s help gives' {
+        $expected = @'
+Convert-HexToRGB -Hex default=[]
+Convert-RGBToANSI4 -RGB default=[]
+Convert-RGBToANSI8 -RGB default=[]
+Export-ColorProfile -Name default=[*]
+Export-ColorProfile -Path default=[]
+Format-ColorEX -ANSI24 default=[False]
+Format-ColorEX -ANSI4 default=[False]
+Format-ColorEX -ANSI8 default=[False]
+Format-ColorEX -AutoPad default=[0]
+Format-ColorEX -BackGroundColor default=[]
+Format-ColorEX -BackGroundGradient default=[]
+Format-ColorEX -Blink default=[False]
+Format-ColorEX -Bold default=[False]
+Format-ColorEX -Color default=[]
+Format-ColorEX -ColorSupport default=[]
+Format-ColorEX -CrossedOut default=[False]
+Format-ColorEX -Debugging default=[False]
+Format-ColorEX -Default default=[False]
+Format-ColorEX -DoubleUnderline default=[False]
+Format-ColorEX -Faint default=[False]
+Format-ColorEX -Gradient default=[]
+Format-ColorEX -GradientDirection default=[Forward]
+Format-ColorEX -GradientEasing default=[Linear]
+Format-ColorEX -GradientHue default=[Shorter]
+Format-ColorEX -GradientRepeat default=[None]
+Format-ColorEX -GradientSpace default=[OKLab]
+Format-ColorEX -GradientSteps default=[0]
+Format-ColorEX -Highlight default=[]
+Format-ColorEX -Italic default=[False]
+Format-ColorEX -Link default=[]
+Format-ColorEX -Markup default=[False]
+Format-ColorEX -Overline default=[False]
+Format-ColorEX -PadCenter default=[False]
+Format-ColorEX -PadChar default=[]
+Format-ColorEX -PadLeft default=[False]
+Format-ColorEX -Reverse default=[False]
+Format-ColorEX -Silent default=[False]
+Format-ColorEX -Split default=[]
+Format-ColorEX -SplitAround default=[]
+Format-ColorEX -SplitEvenly default=[False]
+Format-ColorEX -StartSpaces default=[0]
+Format-ColorEX -StartTab default=[0]
+Format-ColorEX -Style default=[]
+Format-ColorEX -StyleProfile default=[]
+Format-ColorEX -Text default=[]
+Format-ColorEX -Truncate default=[False]
+Format-ColorEX -Underline default=[False]
+Format-ColorEX -UnderlineColor default=[]
+Format-ColorEX -UnderlineStyle default=[]
+Format-ColorEX -Wrap default=[False]
+Get-ColorContrast -BackGroundColor default=[]
+Get-ColorContrast -Color default=[]
+Get-ColorProfiles -Name default=[]
+Get-GradientColor -Count default=[0]
+Get-GradientColor -Gradient default=[]
+Get-GradientColor -GradientDirection default=[Forward]
+Get-GradientColor -GradientEasing default=[Linear]
+Get-GradientColor -GradientHue default=[Shorter]
+Get-GradientColor -GradientRepeat default=[None]
+Get-GradientColor -GradientSpace default=[OKLab]
+Get-GradientColor -GradientSteps default=[0]
+Get-GradientColor -Place default=[]
+Get-LighterANSI8Color -ANSI8Code default=[0]
+Get-LighterANSI8Color -Factor default=[1.4]
+Get-LighterColorName -ColorName default=[]
+Get-LighterRGBColor -Factor default=[1.4]
+Get-LighterRGBColor -RGB default=[]
+Import-ColorProfile -PassThru default=[False]
+Import-ColorProfile -Path default=[]
+Import-ColorProfile -Theme default=[]
+Measure-DisplayWidth -AmbiguousAsWide default=[False]
+Measure-DisplayWidth -Text default=[]
+New-ColorStyle -AddToProfiles default=[False]
+New-ColorStyle -AutoPad default=[0]
+New-ColorStyle -BackgroundColor default=[]
+New-ColorStyle -BackgroundGradient default=[]
+New-ColorStyle -Blink default=[False]
+New-ColorStyle -Bold default=[False]
+New-ColorStyle -CrossedOut default=[False]
+New-ColorStyle -DoubleUnderline default=[False]
+New-ColorStyle -Faint default=[False]
+New-ColorStyle -ForegroundColor default=[Gray]
+New-ColorStyle -Gradient default=[]
+New-ColorStyle -GradientDirection default=[]
+New-ColorStyle -GradientEasing default=[]
+New-ColorStyle -GradientHue default=[]
+New-ColorStyle -GradientRepeat default=[]
+New-ColorStyle -GradientSpace default=[]
+New-ColorStyle -GradientSteps default=[0]
+New-ColorStyle -HorizontalCenter default=[False]
+New-ColorStyle -Italic default=[False]
+New-ColorStyle -LinesAfter default=[0]
+New-ColorStyle -LinesBefore default=[0]
+New-ColorStyle -Name default=[]
+New-ColorStyle -NoNewLine default=[False]
+New-ColorStyle -Overline default=[False]
+New-ColorStyle -PadCenter default=[False]
+New-ColorStyle -PadChar default=[]
+New-ColorStyle -PadLeft default=[False]
+New-ColorStyle -Reverse default=[False]
+New-ColorStyle -SetAsDefault default=[False]
+New-ColorStyle -ShowTime default=[False]
+New-ColorStyle -StartSpaces default=[0]
+New-ColorStyle -StartTab default=[0]
+New-ColorStyle -Truncate default=[False]
+New-ColorStyle -Underline default=[False]
+New-ColorStyle -UnderlineColor default=[]
+New-ColorStyle -UnderlineStyle default=[]
+New-ColorStyle -Wrap default=[False]
+Register-ColorName -Color default=[]
+Register-ColorName -Force default=[False]
+Register-ColorName -Name default=[]
+Remove-ColorProfile -Name default=[]
+Set-ColorDefault -BackgroundColor default=[]
+Set-ColorDefault -Bold default=[False]
+Set-ColorDefault -ForegroundColor default=[Gray]
+Set-ColorDefault -Italic default=[False]
+Set-ColorDefault -ShowTime default=[False]
+Set-ColorDefault -StartSpaces default=[0]
+Set-ColorDefault -StartTab default=[0]
+Set-ColorDefault -Style default=[]
+Set-ColorDefault -Underline default=[False]
+Show-ColorTable -Background default=[False]
+Show-ColorTable -Name default=[*]
+Show-ColorTable -Palette default=[False]
+Show-ColorTable -Profiles default=[False]
+Show-ColorTable -Styles default=[False]
+Test-AnsiSupport -Silent default=[False]
+Unregister-ColorName -Name default=[]
+Write-ColorCritical -LogFile default=[]
+Write-ColorCritical -NoConsoleOutput default=[False]
+Write-ColorCritical -NoNewLine default=[False]
+Write-ColorCritical -PassThru default=[False]
+Write-ColorCritical -Text default=[]
+Write-ColorDebug -LogFile default=[]
+Write-ColorDebug -NoConsoleOutput default=[False]
+Write-ColorDebug -NoNewLine default=[False]
+Write-ColorDebug -PassThru default=[False]
+Write-ColorDebug -Text default=[]
+Write-ColorEX -ANSI24 default=[False]
+Write-ColorEX -ANSI4 default=[False]
+Write-ColorEX -ANSI8 default=[False]
+Write-ColorEX -AutoPad default=[0]
+Write-ColorEX -BackGroundColor default=[]
+Write-ColorEX -BackGroundGradient default=[]
+Write-ColorEX -BlankLine default=[False]
+Write-ColorEX -Blink default=[False]
+Write-ColorEX -Bold default=[False]
+Write-ColorEX -Color default=[]
+Write-ColorEX -ColorSupport default=[]
+Write-ColorEX -CrossedOut default=[False]
+Write-ColorEX -DateTimeFormat default=[yyyy-MM-dd HH:mm:ss]
+Write-ColorEX -Debugging default=[False]
+Write-ColorEX -Default default=[False]
+Write-ColorEX -DoubleUnderline default=[False]
+Write-ColorEX -Encoding default=[utf8]
+Write-ColorEX -Faint default=[False]
+Write-ColorEX -Gradient default=[]
+Write-ColorEX -GradientDirection default=[Forward]
+Write-ColorEX -GradientEasing default=[Linear]
+Write-ColorEX -GradientHue default=[Shorter]
+Write-ColorEX -GradientRepeat default=[None]
+Write-ColorEX -GradientSpace default=[OKLab]
+Write-ColorEX -GradientSteps default=[0]
+Write-ColorEX -Highlight default=[]
+Write-ColorEX -HorizontalCenter default=[False]
+Write-ColorEX -Italic default=[False]
+Write-ColorEX -LinesAfter default=[0]
+Write-ColorEX -LinesBefore default=[0]
+Write-ColorEX -Link default=[]
+Write-ColorEX -LogFile default=[]
+Write-ColorEX -LogLevel default=[]
+Write-ColorEX -LogPath default=[]
+Write-ColorEX -LogRetry default=[2]
+Write-ColorEX -LogTime default=[False]
+Write-ColorEX -Markup default=[False]
+Write-ColorEX -NoConsoleOutput default=[False]
+Write-ColorEX -NoNewLine default=[False]
+Write-ColorEX -Overline default=[False]
+Write-ColorEX -PadCenter default=[False]
+Write-ColorEX -PadChar default=[]
+Write-ColorEX -PadLeft default=[False]
+Write-ColorEX -Reverse default=[False]
+Write-ColorEX -ShowTime default=[False]
+Write-ColorEX -Silent default=[False]
+Write-ColorEX -Split default=[]
+Write-ColorEX -SplitAround default=[]
+Write-ColorEX -SplitEvenly default=[False]
+Write-ColorEX -StartSpaces default=[0]
+Write-ColorEX -StartTab default=[0]
+Write-ColorEX -Style default=[]
+Write-ColorEX -StyleProfile default=[]
+Write-ColorEX -Text default=[]
+Write-ColorEX -Truncate default=[False]
+Write-ColorEX -Underline default=[False]
+Write-ColorEX -UnderlineColor default=[]
+Write-ColorEX -UnderlineStyle default=[]
+Write-ColorEX -Wrap default=[False]
+Write-ColorError -LogFile default=[]
+Write-ColorError -NoConsoleOutput default=[False]
+Write-ColorError -NoNewLine default=[False]
+Write-ColorError -PassThru default=[False]
+Write-ColorError -Text default=[]
+Write-ColorInfo -LogFile default=[]
+Write-ColorInfo -NoConsoleOutput default=[False]
+Write-ColorInfo -NoNewLine default=[False]
+Write-ColorInfo -PassThru default=[False]
+Write-ColorInfo -Text default=[]
+Write-ColorSuccess -LogFile default=[]
+Write-ColorSuccess -NoConsoleOutput default=[False]
+Write-ColorSuccess -NoNewLine default=[False]
+Write-ColorSuccess -PassThru default=[False]
+Write-ColorSuccess -Text default=[]
+Write-ColorWarning -LogFile default=[]
+Write-ColorWarning -NoConsoleOutput default=[False]
+Write-ColorWarning -NoNewLine default=[False]
+Write-ColorWarning -PassThru default=[False]
+Write-ColorWarning -Text default=[]
+'@
+        (Get-HelpDefaults -Module 'PWRSWriteColorEX') -join "`n" | Should -BeExactly ($expected -replace "`r", '')
     }
 
     It 'has the same PSColorStyle members' {

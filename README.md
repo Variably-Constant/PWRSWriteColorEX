@@ -121,8 +121,8 @@ shows all examples with the colors and styles they write.
 
 Three suites hold the module to PSWriteColorEX, and CI runs them on every platform it tests:
 
-- `tests/Surface.Tests.ps1` compares every command and the types it returns, every parameter (type, position, aliases, valid values, parameter sets), alias and `PSColorStyle` member with what PSWriteColorEX declares.
-- `tests/Parity.Tests.ps1` runs the 717 calls in `tests/parity/cases.txt` against both modules, each in a process of its own, under eight color environments: TrueColor, 256 colors, 16 colors, `NO_COLOR`, `TERM=dumb`, `CLICOLOR=0`, `CLICOLOR_FORCE=1` with `TERM=dumb`, and the support the terminal reports. It compares each write to the host with its colors, each warning, error, verbose message and object, and the bytes of each log file, then compares the theme files and the help topic this module copies from PSWriteColorEX with PSWriteColorEX's.
+- `tests/Surface.Tests.ps1` compares every command and the types it returns, every parameter (type, position, aliases, valid values, parameter sets, whether it takes `$null`, an empty value or wildcards, and the default value its help gives), alias and `PSColorStyle` member with what PSWriteColorEX declares.
+- `tests/Parity.Tests.ps1` runs the 718 calls in `tests/parity/cases.txt` against both modules, each in a process of its own, under eight color environments: TrueColor, 256 colors, 16 colors, `NO_COLOR`, `TERM=dumb`, `CLICOLOR=0`, `CLICOLOR_FORCE=1` with `TERM=dumb`, and the support the terminal reports. It compares each write to the host with its colors, each warning, error, verbose message and object, and the bytes of each log file, then compares the theme files and the help topic this module copies from PSWriteColorEX with PSWriteColorEX's.
 - `tests/Transcript.Tests.ps1` checks that a transcript records each line once, as PSWriteColorEX does.
 
 ## Differences from PSWriteColorEX
@@ -160,15 +160,15 @@ Each write to the host is one call into .NET, through PWRS's `Pipeline::write_ho
 
 ## Building and testing
 
-The module builds with [PWRS](https://github.com/Variably-Constant/PWRS) 0.7.0 from crates.io, published as `PoWerRuSt`, and `cargo pwrs` of the same release:
+The module builds with [PWRS](https://github.com/Variably-Constant/PWRS) 1.0.0 from crates.io, published as `PoWerRuSt`, and `cargo pwrs` of the same release:
 
 ```text
-cargo install cargo-pwrs --version 0.7.0 --locked
+cargo install cargo-pwrs --version 1.0.0 --locked
 cargo pwrs build --release      # the module folder in target/pwrs/PWRSWriteColorEX
 cargo pwrs test --release       # the Rust tests, then the Pester suites
 ```
 
-`cargo pwrs test` runs the Pester suites in PowerShell 7, and on Windows in Windows PowerShell 5.1 as well. The parity suite needs a checkout of [PSWriteColorEX](https://github.com/MarkusMcNugen/PSWriteColorEX), named by `PSWRITECOLOREX`:
+`cargo pwrs test` fetches Pester 6.2.0 the first time and runs the Pester suites under it in PowerShell 7, and on Windows in Windows PowerShell 5.1 as well. The parity suite needs a checkout of [PSWriteColorEX](https://github.com/MarkusMcNugen/PSWriteColorEX), named by `PSWRITECOLOREX`:
 
 ```text
 git clone https://github.com/MarkusMcNugen/PSWriteColorEX ../PSWriteColorEX

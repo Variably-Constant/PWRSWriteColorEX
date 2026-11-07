@@ -70,20 +70,20 @@ fn write_with_profile(ps: &Pipeline<'_>, profile: &str, call: HelperCall<'_>) ->
 pub struct WriteColorError {
     /// The message. Several strings are written on one line; strings piped in are written one
     /// line each.
-    #[param(position = 0, value_from_pipeline)]
+    #[param(position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// Leaves the line open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// Writes the message to this log file as well. A file name alone goes in the folder of the
     /// calling script, or the current location when called from the prompt.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub log_file: Option<String>,
     /// Writes nothing to the host, only to the log file.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_console_output: bool,
     /// Writes the text to the pipeline after writing it to the host.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 
@@ -118,20 +118,20 @@ impl WriteColorError {
 pub struct WriteColorWarning {
     /// The message. Several strings are written on one line; strings piped in are written one
     /// line each.
-    #[param(position = 0, value_from_pipeline)]
+    #[param(position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// Leaves the line open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// Writes the message to this log file as well. A file name alone goes in the folder of the
     /// calling script, or the current location when called from the prompt.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub log_file: Option<String>,
     /// Writes nothing to the host, only to the log file.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_console_output: bool,
     /// Writes the text to the pipeline after writing it to the host.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 
@@ -166,20 +166,20 @@ impl WriteColorWarning {
 pub struct WriteColorInfo {
     /// The message. Several strings are written on one line; strings piped in are written one
     /// line each.
-    #[param(position = 0, value_from_pipeline)]
+    #[param(position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// Leaves the line open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// Writes the message to this log file as well. A file name alone goes in the folder of the
     /// calling script, or the current location when called from the prompt.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub log_file: Option<String>,
     /// Writes nothing to the host, only to the log file.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_console_output: bool,
     /// Writes the text to the pipeline after writing it to the host.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 
@@ -214,20 +214,20 @@ impl WriteColorInfo {
 pub struct WriteColorSuccess {
     /// The message. Several strings are written on one line; strings piped in are written one
     /// line each.
-    #[param(position = 0, value_from_pipeline)]
+    #[param(position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// Leaves the line open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// Writes the message to this log file as well. A file name alone goes in the folder of the
     /// calling script, or the current location when called from the prompt.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub log_file: Option<String>,
     /// Writes nothing to the host, only to the log file.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_console_output: bool,
     /// Writes the text to the pipeline after writing it to the host.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 
@@ -262,20 +262,20 @@ impl WriteColorSuccess {
 pub struct WriteColorCritical {
     /// The message. Several strings are written on one line; strings piped in are written one
     /// line each.
-    #[param(position = 0, value_from_pipeline)]
+    #[param(position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// Leaves the line open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// Writes the message to this log file as well. A file name alone goes in the folder of the
     /// calling script, or the current location when called from the prompt.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub log_file: Option<String>,
     /// Writes nothing to the host, only to the log file.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_console_output: bool,
     /// Writes the text to the pipeline after writing it to the host.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 
@@ -310,20 +310,20 @@ impl WriteColorCritical {
 pub struct WriteColorDebug {
     /// The message. Several strings are written on one line; strings piped in are written one
     /// line each.
-    #[param(position = 0, value_from_pipeline)]
+    #[param(position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// Leaves the line open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// Writes the message to this log file as well. A file name alone goes in the folder of the
     /// calling script, or the current location when called from the prompt.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub log_file: Option<String>,
     /// Writes nothing to the host, only to the log file.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_console_output: bool,
     /// Writes the text to the pipeline after writing it to the host.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 

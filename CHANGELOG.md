@@ -10,6 +10,70 @@ PWRSWriteColorEX's major and minor version are those of the PSWriteColorEX
 release whose commands and output it matches; its patch number may differ from
 PSWriteColorEX's.
 
+## [1.2.2] - 2026-11-06
+
+The commands, parameters and output of PSWriteColorEX 1.2.1, built with PWRS
+1.0.0.
+
+### Changed
+
+- The module is built with PWRS 1.0.0 from crates.io, published as
+  `PoWerRuSt`, and `cargo pwrs` 1.0.0, where 1.2.1 was built with 0.7.0. In a
+  session this means:
+  - A string `Format-ColorEX` returns, and a warning or verbose message, of up
+    to 512 UTF-8 bytes is converted to UTF-16 on the stack, so writing it
+    allocates nothing; a write to the host still converts into a copy of its
+    own. `Measure-DisplayWidth` reads each piped string into the buffer it read
+    the one before into.
+  - Importing the module no longer loads `Microsoft.PowerShell.Utility`, whose
+    first command made PowerShell analyze every module on `PSModulePath` that
+    its cache did not have.
+  - A copy of the same version imported from another folder, as a module that
+    bundles this one imports it, stands down and leaves the loaded copy's
+    commands in place. In PowerShell 7 such an import failed with
+    `A cmdlet named '<name>' already exists`. A copy of another version stops
+    the import, naming both versions and folders.
+  - In Windows PowerShell 5.1 the module cannot share a session with a module
+    built by PWRS 0.8.0 or earlier, in either order. PowerShell 7 imports them
+    in either order.
+- `Write-ColorEX` and `Format-ColorEX` read which parameters a call gave only
+  when the call applies a style profile, through `-StyleProfile` or `-Default`,
+  and then in one read of its bound parameters. Every call asked .NET about
+  each of their 59 and 44 parameters on its own.
+- `Get-Help` gives every parameter of every command the default value
+  PSWriteColorEX's help gives: the parameter's default, such as OKLab for
+  `-GradientSpace`, 2 for `-LogRetry` and `*` for `Show-ColorTable -Name`;
+  False for a switch; and nothing for a parameter without one. It gave None
+  for each of the 218.
+- `Show-ColorTable -Name` and `Export-ColorProfile -Name` are declared to take
+  wildcards, as PSWriteColorEX's are, so `Get-Help` says they do.
+  `-Gradient` and `-BackGroundGradient` of `Write-ColorEX` and `Format-ColorEX`
+  declare `[AllowNull()]`, as PSWriteColorEX's do.
+- The module manifest's tags are PSWriteColorEX's, with FreeBSD, Rust and
+  PSWriteColorEX added, so the PowerShell Gallery finds the two modules by the
+  same searches and lists this one under both editions' filters.
+
+### Fixed
+
+- Each runspace that imports the module has registered color names and a
+  detected color support of its own, as each import of PSWriteColorEX has
+  script variables of its own. An import in another runspace, as
+  `ForEach-Object -Parallel`, a thread job or a runspace pool makes, cleared the
+  names every runspace had registered and the support detected for it, and a
+  name registered in one runspace was found in every other. Whether the host
+  shows escape codes is now read once for each import in a runspace, where it
+  was read once for the process.
+
+### Added
+
+- `tests/Surface.Tests.ps1` compares which parameters take `$null`, an empty
+  value or wildcards, and the default value `Get-Help` gives each parameter,
+  with PSWriteColorEX's. `tests/parity/cases.txt` runs a second runspace that
+  imports the module and registers a name, and compares what each runspace
+  finds with what PSWriteColorEX's runspaces find. `tests/WriteColorEX.Tests.ps1`
+  checks that `-Debugging` under `-Debug` writes every message without asking
+  whether to continue.
+
 ## [1.2.1] - 2026-10-21
 
 The commands, parameters and output of PSWriteColorEX 1.2.1.
@@ -181,5 +245,6 @@ written in Rust with [PWRS (PoWerRuSt)](https://github.com/Variably-Constant/PWR
   2.35 or later), macOS arm64 and x64, and FreeBSD x64, for PowerShell 7.4 or
   later and Windows PowerShell 5.1.
 
+[1.2.2]: https://www.powershellgallery.com/packages/PWRSWriteColorEX/1.2.2
 [1.2.1]: https://www.powershellgallery.com/packages/PWRSWriteColorEX/1.2.1
 [1.2.0]: https://www.powershellgallery.com/packages/PWRSWriteColorEX/1.2.0

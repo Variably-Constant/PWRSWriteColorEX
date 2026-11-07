@@ -181,11 +181,11 @@ pub fn split_display_characters(text: &str) -> Vec<&str> {
 #[derive(Default)]
 pub struct MeasureDisplayWidth {
     /// The text string to measure.
-    #[param(mandatory, position = 0, value_from_pipeline, allow_empty_string)]
+    #[param(mandatory, position = 0, value_from_pipeline, allow_empty_string, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: String,
     /// Treats East Asian Ambiguous characters as 2 cells instead of 1, and keeps a wide emoji
     /// followed by U+FE0E at 2 cells, as East Asian terminals draw them.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub ambiguous_as_wide: bool,
 }
 

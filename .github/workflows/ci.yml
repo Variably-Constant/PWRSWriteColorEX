@@ -29,7 +29,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CARGO_PWRS_VERSION: '0.7.0'
+  CARGO_PWRS_VERSION: '1.0.0'
+  # cargo pwrs test fetches Pester 6.2.0 into the PWRS toolchain, which each job caches, and runs
+  # the suites under it in both hosts; the FreeBSD job saves the same version for its shim
   PESTER_VERSION: '6.2.0'
   # PSWriteColorEX 1.2.1, the module this one matches
   PSWRITECOLOREX_REF: 4f63d21245f3403ae52d30c2fd908a09b328d9c1
@@ -67,16 +69,6 @@ jobs:
               cargo install cargo-pwrs --version $env:CARGO_PWRS_VERSION --locked
               if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-pwrs failed' }
           }
-
-      # cargo pwrs test imports the Pester PWRS_PESTER_PATH names, in pwsh and in Windows
-      # PowerShell alike
-      - name: Pester ${{ env.PESTER_VERSION }}
-        shell: pwsh
-        run: |
-          $dir = Join-Path $env:RUNNER_TEMP 'pester'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          Save-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Path $dir -Force
-          Add-Content -Path $env:GITHUB_ENV -Value "PWRS_PESTER_PATH=$(Join-Path $dir "Pester/$env:PESTER_VERSION/Pester.psd1")"
 
       - name: The hosts this job runs on
         shell: pwsh
@@ -151,14 +143,6 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-zigbuild failed' }
           }
 
-      - name: Pester ${{ env.PESTER_VERSION }}
-        shell: pwsh
-        run: |
-          $dir = Join-Path $env:RUNNER_TEMP 'pester'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          Save-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Path $dir -Force
-          Add-Content -Path $env:GITHUB_ENV -Value "PWRS_PESTER_PATH=$(Join-Path $dir "Pester/$env:PESTER_VERSION/Pester.psd1")"
-
       - name: Build linux-x64 for glibc 2.35 and run the suites
         shell: pwsh
         env:
@@ -228,14 +212,6 @@ jobs:
               cargo install cargo-pwrs --version $env:CARGO_PWRS_VERSION --locked
               if ($LASTEXITCODE -ne 0) { throw 'cargo install cargo-pwrs failed' }
           }
-
-      - name: Pester ${{ env.PESTER_VERSION }}
-        shell: pwsh
-        run: |
-          $dir = Join-Path $env:RUNNER_TEMP 'pester'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          Save-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Path $dir -Force
-          Add-Content -Path $env:GITHUB_ENV -Value "PWRS_PESTER_PATH=$(Join-Path $dir "Pester/$env:PESTER_VERSION/Pester.psd1")"
 
       # .cargo/config.toml builds for the apple-a14 core, the oldest Apple Silicon, so the
       # library runs on every Mac that has one

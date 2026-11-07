@@ -1,12 +1,11 @@
 //! Format-ColorEX: Write-ColorEX's text, color, style and width parameters, with each line
 //! returned as a string instead of written to the host, as PSWriteColorEX's.
 
-use std::collections::HashSet;
-
 use pwrs::prelude::*;
 
 use crate::detect::Support;
-use crate::write::{begin_checks, caller_script_root, color_parameter, gradient_list, render, style_argument, WriteOptions};
+use crate::session;
+use crate::write::{begin_checks, bound_for_profile, caller_script_root, color_parameter, gradient_list, render, style_argument, WriteOptions};
 
 /// Returns text with its colors and styles as escape codes, as Write-ColorEX would write it.
 ///
@@ -30,150 +29,150 @@ use crate::write::{begin_checks, caller_script_root, color_parameter, gradient_l
 pub struct FormatColorEX {
     /// The text. Several strings make one line, each with its own colors and styles. Strings
     /// piped in are formatted one line each.
-    #[param(position = 0, value_from_pipeline, alias = ["T"])]
+    #[param(position = 0, value_from_pipeline, alias = ["T"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub text: Option<Vec<String>>,
     /// The text color of each segment, as Write-ColorEX's -Color takes it.
-    #[param(position = 1, alias = ["C", "ForegroundColor", "FGC"], clr = "System.Array")]
+    #[param(position = 1, alias = ["C", "ForegroundColor", "FGC"], clr = "System.Array", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub color: Option<PsObject>,
     /// The background color of each segment, as Write-ColorEX's -BackGroundColor takes it.
-    #[param(position = 2, alias = ["B", "BGC"], clr = "System.Array")]
+    #[param(position = 2, alias = ["B", "BGC"], clr = "System.Array", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub back_ground_color: Option<PsObject>,
     /// Two or more colors to blend across the text, as Write-ColorEX's -Gradient takes them.
-    #[param(alias = ["Grad"])]
+    #[param(alias = ["Grad"], allow_null, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient: Option<Vec<PsObject>>,
     /// Two or more colors to blend across the background, as Write-ColorEX's -BackGroundGradient
     /// takes them.
-    #[param(alias = ["BGGrad"])]
+    #[param(alias = ["BGGrad"], allow_null, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub back_ground_gradient: Option<Vec<PsObject>>,
     /// How the gradients blend their colors: OKLab (the default), RGB, LinearRGB, OKLCH, HSL, HSV,
     /// Lab or LCh, as Write-ColorEX's -GradientSpace takes them.
-    #[param(validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"])]
+    #[param(validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "OKLab")))]
     pub gradient_space: Option<String>,
     /// The way round the hue wheel in OKLCH, HSL, HSV and LCh: Shorter (the default), Longer,
     /// Increasing or Decreasing.
-    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"])]
+    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Shorter")))]
     pub gradient_hue: Option<String>,
     /// A curve that moves the colors along the text, as Write-ColorEX's -GradientEasing takes it.
     #[param(validate_set = [
         "Linear", "InSine", "OutSine", "InOutSine", "InQuad", "OutQuad", "InOutQuad", "InCubic", "OutCubic", "InOutCubic", "InQuart", "OutQuart",
         "InOutQuart", "InQuint", "OutQuint", "InOutQuint", "InExpo", "OutExpo", "InOutExpo", "InCirc", "OutCirc", "InOutCirc", "InBack", "OutBack",
         "InOutBack", "InElastic", "OutElastic", "InOutElastic", "InBounce", "OutBounce", "InOutBounce"
-    ])]
+    ], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Linear")))]
     pub gradient_easing: Option<String>,
     /// What a gradient does past placed first and last colors: None (the default), Repeat or
     /// Mirror.
-    #[param(validate_set = ["None", "Repeat", "Mirror"])]
+    #[param(validate_set = ["None", "Repeat", "Mirror"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "None")))]
     pub gradient_repeat: Option<String>,
     /// The way a gradient runs across the text: Forward (the default), Reverse, CenterOut or
     /// EdgesIn.
-    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"])]
+    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Forward")))]
     pub gradient_direction: Option<String>,
     /// Cuts a gradient into this many bands of solid color; 0, the default, blends smoothly.
-    #[param(validate_range(0, 2147483647))]
+    #[param(validate_range(0, 2147483647), attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub gradient_steps: i32,
     /// Uses ANSI 4-bit colors.
-    #[param(alias = ["A4"])]
+    #[param(alias = ["A4"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub ANSI4: bool,
     /// Uses ANSI 8-bit colors.
-    #[param(alias = ["A8"])]
+    #[param(alias = ["A8"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub ANSI8: bool,
     /// Uses 24-bit TrueColor.
-    #[param(alias = ["A24", "TrueColor", "TC"])]
+    #[param(alias = ["A24", "TrueColor", "TC"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub ANSI24: bool,
     /// The color support to format for, in place of the detection and the color variables: None,
     /// ANSI4, ANSI8 or TrueColor, as Write-ColorEX's -ColorSupport takes it. ANSI4, ANSI8 and
     /// TrueColor give escape codes for that support, and None gives the text alone.
-    #[param(validate_set = ["None", "ANSI4", "ANSI8", "TrueColor"])]
+    #[param(validate_set = ["None", "ANSI4", "ANSI8", "TrueColor"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub color_support: Option<String>,
     /// The styles of each segment, as Write-ColorEX's -Style takes them.
-    #[param(alias = ["S"])]
+    #[param(alias = ["S"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub style: Option<PsObject>,
     /// A PSColorStyle with colors, styles and layout settings. Parameters given take precedence.
-    #[param(clr = "PSColorStyle")]
+    #[param(clr = "PSColorStyle", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub style_profile: Option<PsObject>,
     /// Applies the default style set with Set-ColorDefault.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub default: bool,
     /// Bold text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub bold: bool,
     /// Faint (dimmed) text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub faint: bool,
     /// Italic text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub italic: bool,
     /// Underlined text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub underline: bool,
     /// Blinking text, where the terminal supports it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub blink: bool,
     /// Text struck through.
-    #[param(alias = ["Strikethrough"])]
+    #[param(alias = ["Strikethrough"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub crossed_out: bool,
     /// Text underlined twice, where the terminal supports it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub double_underline: bool,
     /// A line above the text, where the terminal supports it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub overline: bool,
     /// Text and background colors swapped.
-    #[param(alias = ["Invert"])]
+    #[param(alias = ["Invert"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub reverse: bool,
     /// The color of the underline of each segment.
-    #[param(clr = "System.Array")]
+    #[param(clr = "System.Array", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub underline_color: Option<PsObject>,
     /// The kind of underline: Single, Double, Curly, Dotted or Dashed.
-    #[param(validate_set = ["Single", "Double", "Curly", "Dotted", "Dashed"])]
+    #[param(validate_set = ["Single", "Double", "Curly", "Dotted", "Dashed"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub underline_style: Option<String>,
     /// Reads markup tags in the text, as Write-ColorEX's -Markup does.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub markup: bool,
     /// Cuts each string after each of these separators.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub split: Option<Vec<String>>,
     /// Cuts each string before and after each of these separators.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub split_around: Option<Vec<String>>,
     /// Cuts each string into as many parts as there are colors.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub split_evenly: bool,
     /// Colors and styles the text regular expressions match, as Write-ColorEX's -Highlight does.
-    #[param(clr = "System.Collections.IDictionary")]
+    #[param(clr = "System.Collections.IDictionary", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub highlight: Option<PsObject>,
     /// The address each segment links to.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub link: Option<Vec<String>>,
     /// The number of tab characters before the text.
-    #[param(alias = ["Indent"])]
+    #[param(alias = ["Indent"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub start_tab: i32,
     /// The number of spaces before the text, after any tabs.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub start_spaces: i32,
     /// Pads the text to this display width.
-    #[param(alias = ["PadWidth", "Pad"])]
+    #[param(alias = ["PadWidth", "Pad"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub auto_pad: i32,
     /// With -AutoPad, pads on the left (right-aligns the text).
-    #[param(alias = ["RightAlign"])]
+    #[param(alias = ["RightAlign"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pad_left: bool,
     /// With -AutoPad, centers the text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pad_center: bool,
     /// The character -AutoPad pads with.
-    #[param(alias = ["PaddingChar", "FillChar"])]
+    #[param(alias = ["PaddingChar", "FillChar"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub pad_char: Option<char>,
     /// With -AutoPad, cuts text wider than -AutoPad, ending it with an ellipsis.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub truncate: bool,
     /// Breaks text wider than the line into lines, one string each.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub wrap: bool,
     /// Writes [DEBUG] messages about color processing and detection.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub debugging: bool,
     /// Suppresses the warnings about colors and fallbacks.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub silent: bool,
 }
 
@@ -187,6 +186,7 @@ const PARAMETER_NAMES: &[&str] = &[
 
 impl Cmdlet for FormatColorEX {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         // Write-ColorEX's checks run for each string, as each string is a call of its own
         let highlight = begin_checks(
             ps,
@@ -200,13 +200,9 @@ impl Cmdlet for FormatColorEX {
             self.highlight.as_ref(),
             self.silent,
         )?;
-        let mut bound = HashSet::new();
+        let applies_profile = self.default || self.style_profile.as_ref().is_some_and(|p| !p.is_null());
+        let mut bound = bound_for_profile(ps, PARAMETER_NAMES, applies_profile)?;
         bound.insert("text".to_string());
-        for name in PARAMETER_NAMES {
-            if ps.parameter_is_bound(name) {
-                bound.insert(name.to_ascii_lowercase());
-            }
-        }
         let options = WriteOptions {
             text: self.text.clone().unwrap_or_default(),
             color: color_parameter(self.color.as_ref(), "Color")?,

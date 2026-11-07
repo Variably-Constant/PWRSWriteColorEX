@@ -9,6 +9,7 @@ use crate::colors::{self, lookup};
 use crate::ease::Easing;
 use crate::forms::{read_forms, UnknownNames};
 use crate::oklab;
+use crate::session;
 use crate::spaces::{self, Coordinates, HuePath, Space};
 use crate::write::{gradient_list, hex_rgb, ColorArg};
 
@@ -526,22 +527,22 @@ pub fn gradient_colors(ps: &Pipeline<'_>, given: &[ColorArg], places: &[Option<f
 pub struct GetGradientColor {
     /// Two or more colors, or the name of a named gradient, as Write-ColorEX's -Gradient takes
     /// them. A color may give its place along the gradient after an '@', as a percent: 'Gold@40'.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient: Vec<PsObject>,
     /// The number of colors to return, as for a line of that many characters.
-    #[param(mandatory, set = "Count", validate_range(1, 2147483647))]
+    #[param(mandatory, set = "Count", validate_range(1, 2147483647), attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub count: i32,
     /// The places along the gradient of the colors to return, from 0 at its start to 1 at its end:
     /// one color for each place, in the order given. A place below 0 is 0 and above 1 is 1.
-    #[param(mandatory, set = "Place")]
+    #[param(mandatory, set = "Place", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub place: Vec<f64>,
     /// How the colors blend: OKLab (the default), RGB, LinearRGB, OKLCH, HSL, HSV, Lab or LCh, as
     /// Write-ColorEX's -GradientSpace takes them.
-    #[param(validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"])]
+    #[param(validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "OKLab")))]
     pub gradient_space: Option<String>,
     /// The way round the hue wheel in OKLCH, HSL, HSV and LCh: Shorter (the default), Longer,
     /// Increasing or Decreasing.
-    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"])]
+    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Shorter")))]
     pub gradient_hue: Option<String>,
     /// A curve that moves the colors along the gradient, as Write-ColorEX's -GradientEasing takes
     /// it.
@@ -549,22 +550,23 @@ pub struct GetGradientColor {
         "Linear", "InSine", "OutSine", "InOutSine", "InQuad", "OutQuad", "InOutQuad", "InCubic", "OutCubic", "InOutCubic", "InQuart", "OutQuart",
         "InOutQuart", "InQuint", "OutQuint", "InOutQuint", "InExpo", "OutExpo", "InOutExpo", "InCirc", "OutCirc", "InOutCirc", "InBack", "OutBack",
         "InOutBack", "InElastic", "OutElastic", "InOutElastic", "InBounce", "OutBounce", "InOutBounce"
-    ])]
+    ], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Linear")))]
     pub gradient_easing: Option<String>,
     /// What the gradient does past placed first and last colors: None (the default), Repeat or
     /// Mirror.
-    #[param(validate_set = ["None", "Repeat", "Mirror"])]
+    #[param(validate_set = ["None", "Repeat", "Mirror"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "None")))]
     pub gradient_repeat: Option<String>,
     /// The way the gradient runs: Forward (the default), Reverse, CenterOut or EdgesIn.
-    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"])]
+    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Forward")))]
     pub gradient_direction: Option<String>,
     /// Cuts the gradient into this many bands of solid color; 0, the default, blends smoothly.
-    #[param(validate_range(0, 2147483647))]
+    #[param(validate_range(0, 2147483647), attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub gradient_steps: i32,
 }
 
 impl Cmdlet for GetGradientColor {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         let mut colors = gradient_list(&self.gradient)?;
         resolve_name_in(&mut colors);
         if colors.len() < 2 {

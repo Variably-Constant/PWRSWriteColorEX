@@ -590,6 +590,8 @@ Show-ColorTable 'Red', 'Dark?ed' -Background
 Show-ColorTable NoSuchName
 Register-ColorName Zz '#123456'; Show-ColorTable Zz; Unregister-ColorName Zz
 Show-ColourTable '[g]reen'
+# Runspaces: each runspace that imports the module has registered names of its own, which another runspace's import or names leave as they are
+Register-ColorName Kept '#FF8000'; $m = Get-Module -Name '*WriteColorEX' | Select-Object -First 1; $r = [runspacefactory]::CreateRunspace(); $r.Open(); $p = [powershell]::Create(); $p.Runspace = $r; [void]$p.AddScript("Import-Module '$(Join-Path $m.ModuleBase ($m.Name + '.psd1'))' -WarningAction SilentlyContinue; Format-ColorEX -Text 'other' -Color Kept -ANSI24; Register-ColorName Apart '#0080FF'"); $p.Invoke(); $p.Streams.Warning | ForEach-Object Message; $p.Dispose(); Write-ColorEX -Text 'kept' -Color Kept -ANSI24; (Get-ColorTableWithRGB).ContainsKey('Apart'); $r.Dispose(); Write-ColorEX -Text 'closed' -Color Kept -ANSI24; Unregister-ColorName Kept
 # Profile files
 $s = New-ColorStyle -Name 'Exported' -ForegroundColor Red -BackgroundGradient Blue, Green -GradientSpace RGB -Reverse -UnderlineColor '#FF0000' -UnderlineStyle Curly -PadCenter -Truncate -Wrap -AutoPad 10 -PadChar '*' -Bold -AddToProfiles; Export-ColorProfile -Path "$TestDir/p.json" -Name Exported; Get-Content "$TestDir/p.json" -Raw; Remove-Item "$TestDir/p.json"; Remove-ColorProfile Exported
 Register-ColorName Exp '#010203'; Export-ColorProfile "$TestDir/all.json"; [BitConverter]::ToString([IO.File]::ReadAllBytes("$TestDir/all.json")); Remove-Item "$TestDir/all.json"; Unregister-ColorName Exp

@@ -4,9 +4,9 @@ version = 4
 
 [[package]]
 name = "PoWerRuSt"
-version = "0.7.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c39fa017947eecd4ea41660075d0dcd66b028aae855511bd0c705f1951b4dd16"
+checksum = "d0f96029908e9d983cd3e71b532af6530434cf591a50721709c904295a5c9336"
 dependencies = [
  "pwrs-macros",
  "pwrs-sys",
@@ -23,9 +23,9 @@ dependencies = [
 
 [[package]]
 name = "pwrs-macros"
-version = "0.7.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d7127935b151d6b84404666e18e03a48af0c61a1c4790323e58138d0192261a"
+checksum = "0246d1a03818637963f534f92153a58b97a09f3765ae70c65c1649f1b237a0ff"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -34,13 +34,13 @@ dependencies = [
 
 [[package]]
 name = "pwrs-sys"
-version = "0.7.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d08e75edaab23d3f0b9c2be3863aeecb1e4f5e42ec275aa53f2230341314b315"
+checksum = "55b192528385deda51ab4e216c018c9cc452a1a3ef31a14aee96910f49e6ace7"
 
 [[package]]
 name = "pwrs-write-color-ex"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "PoWerRuSt",
  "subetha-core",

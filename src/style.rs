@@ -69,32 +69,32 @@ pub fn helper_profile(name: &str) -> PsResult<PsObject> {
 #[derive(Default)]
 pub struct SetColorDefault {
     /// A PSColorStyle to make the default.
-    #[param(set = "Object", clr = "PSColorStyle")]
+    #[param(set = "Object", clr = "PSColorStyle", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub style: Option<PsObject>,
     /// The text color of the new default style: a color name, a hex code, an RGB array or an ANSI
     /// color number. Gray when left out.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Gray")))]
     pub foreground_color: Option<PsObject>,
     /// The background color of the new default style.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub background_color: Option<PsObject>,
     /// Makes the default style bold.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub bold: bool,
     /// Makes the default style italic.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub italic: bool,
     /// Underlines the default style.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub underline: bool,
     /// Writes the time before the text with the default style.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub show_time: bool,
     /// The number of tabs before the text with the default style.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub start_tab: i32,
     /// The number of spaces before the text with the default style.
-    #[param(set = "Properties")]
+    #[param(set = "Properties", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub start_spaces: i32,
 }
 
@@ -139,7 +139,7 @@ impl Cmdlet for SetColorDefault {
 #[derive(Default)]
 pub struct GetColorProfiles {
     /// The name of the profile to get, compared without regard to case.
-    #[param(position = 0)]
+    #[param(position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub name: Option<String>,
 }
 
@@ -171,84 +171,84 @@ impl Cmdlet for GetColorProfiles {
 #[derive(Default)]
 pub struct NewColorStyle {
     /// The name of the style, its key in [PSColorStyle]::Profiles.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub name: String,
     /// The text color: a color name, a hex code, an RGB array or an ANSI color number. Gray when
     /// left out.
-    #[param(position = 1)]
+    #[param(position = 1, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "Gray")))]
     pub foreground_color: Option<PsObject>,
     /// The background color, in the same forms as -ForegroundColor.
-    #[param(position = 2)]
+    #[param(position = 2, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub background_color: Option<PsObject>,
     /// Two or more colors to blend across the text, or the name of a named gradient, such as
     /// Sunset, in place of -ForegroundColor.
-    #[param(position = 3)]
+    #[param(position = 3, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient: Option<Vec<PsObject>>,
     /// Bold text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub bold: bool,
     /// Italic text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub italic: bool,
     /// Underlined text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub underline: bool,
     /// Blinking text, where the terminal supports it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub blink: bool,
     /// Faint (dimmed) text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub faint: bool,
     /// Text struck through.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub crossed_out: bool,
     /// Text underlined twice, where the terminal supports it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub double_underline: bool,
     /// A line above the text, where the terminal supports it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub overline: bool,
     /// The time before the text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub show_time: bool,
     /// The line left open, so the next output continues it.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub no_new_line: bool,
     /// The text centered in the console window.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub horizontal_center: bool,
     /// The number of tabs before the text.
-    #[param(position = 4)]
+    #[param(position = 4, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub start_tab: i32,
     /// The number of spaces before the text.
-    #[param(position = 5)]
+    #[param(position = 5, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub start_spaces: i32,
     /// The number of blank lines before the text.
-    #[param(position = 6)]
+    #[param(position = 6, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub lines_before: i32,
     /// The number of blank lines after the text.
-    #[param(position = 7)]
+    #[param(position = 7, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub lines_after: i32,
     /// The display width to pad the text to.
-    #[param(position = 8)]
+    #[param(position = 8, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub auto_pad: i32,
     /// Pads on the left, right-aligning the text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pad_left: bool,
     /// The character to pad with.
-    #[param(position = 9)]
+    #[param(position = 9, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub pad_char: Option<char>,
     /// Two or more colors to blend across the background, or the name of a named gradient. It
     /// replaces -BackgroundColor.
-    #[param(position = 10)]
+    #[param(position = 10, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub background_gradient: Option<Vec<PsObject>>,
     /// How the gradients blend their colors: OKLab, RGB, LinearRGB, OKLCH, HSL, HSV, Lab or LCh, as
     /// Write-ColorEX's -GradientSpace takes them. Without it, Write-ColorEX's default, OKLab.
-    #[param(position = 11, validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"])]
+    #[param(position = 11, validate_set = ["OKLab", "RGB", "LinearRGB", "OKLCH", "HSL", "HSV", "Lab", "LCh"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient_space: Option<String>,
     /// The way round the hue wheel in OKLCH, HSL, HSV and LCh: Shorter, Longer, Increasing or
     /// Decreasing. Without it, Write-ColorEX's default, Shorter.
-    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"])]
+    #[param(validate_set = ["Shorter", "Longer", "Increasing", "Decreasing"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient_hue: Option<String>,
     /// A curve that moves the colors along the text, as Write-ColorEX's -GradientEasing takes it.
     /// Without it, Write-ColorEX's default, Linear.
@@ -256,42 +256,42 @@ pub struct NewColorStyle {
         "Linear", "InSine", "OutSine", "InOutSine", "InQuad", "OutQuad", "InOutQuad", "InCubic", "OutCubic", "InOutCubic", "InQuart", "OutQuart",
         "InOutQuart", "InQuint", "OutQuint", "InOutQuint", "InExpo", "OutExpo", "InOutExpo", "InCirc", "OutCirc", "InOutCirc", "InBack", "OutBack",
         "InOutBack", "InElastic", "OutElastic", "InOutElastic", "InBounce", "OutBounce", "InOutBounce"
-    ])]
+    ], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient_easing: Option<String>,
     /// What the gradients do past placed first and last colors: None, Repeat or Mirror. Without
     /// it, Write-ColorEX's default, None.
-    #[param(validate_set = ["None", "Repeat", "Mirror"])]
+    #[param(validate_set = ["None", "Repeat", "Mirror"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient_repeat: Option<String>,
     /// The way the gradients run across the text: Forward, Reverse, CenterOut or EdgesIn. Without
     /// it, Write-ColorEX's default, Forward.
-    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"])]
+    #[param(validate_set = ["Forward", "Reverse", "CenterOut", "EdgesIn"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub gradient_direction: Option<String>,
     /// Cuts the gradients into this many bands of solid color. 0 blends smoothly.
-    #[param(validate_range(0, 2147483647))]
+    #[param(validate_range(0, 2147483647), attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub gradient_steps: i32,
     /// Swaps the text and background colors.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub reverse: bool,
     /// The color of the underline.
-    #[param(position = 12)]
+    #[param(position = 12, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub underline_color: Option<PsObject>,
     /// The kind of underline: Single, Double, Curly, Dotted or Dashed.
-    #[param(position = 13, validate_set = ["Single", "Double", "Curly", "Dotted", "Dashed"])]
+    #[param(position = 13, validate_set = ["Single", "Double", "Curly", "Dotted", "Dashed"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub underline_style: Option<String>,
     /// With -AutoPad, centers the text.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pad_center: bool,
     /// With -AutoPad, cuts text wider than -AutoPad, ending it with an ellipsis.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub truncate: bool,
     /// Breaks text wider than the line into lines.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub wrap: bool,
     /// Adds the style to [PSColorStyle]::Profiles under its name.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub add_to_profiles: bool,
     /// Makes the style the one -Default applies.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub set_as_default: bool,
 }
 

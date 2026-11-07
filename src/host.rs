@@ -7,6 +7,7 @@ use std::mem::ManuallyDrop;
 use pwrs::prelude::*;
 use pwrs::{ConsoleColor, ErrorCategory, PsError};
 
+use crate::session;
 use crate::set_once::SetOnce;
 
 /// An environment variable as the session sees it. PowerShell 7 on Linux and macOS keeps
@@ -61,10 +62,10 @@ fn raw_ui(cmdlet: &PsObject) -> Option<PsObject> {
 
 /// Whether the host lets escape codes through to the screen. PowerShell 7.2 and later remove
 /// them from the output of a host without virtual terminal support, such as a process with no
-/// console; earlier versions pass them through. Read once per session.
+/// console; earlier versions pass them through. Read once for each import of the module in a
+/// runspace, and kept in the runspace's state.
 pub fn host_virtual_terminal(ps: &Pipeline<'_>) -> bool {
-    static VT: SetOnce<bool> = SetOnce::new();
-    *VT.get_or_init(|| {
+    session::kept_answer(|session| &session.virtual_terminal, || {
         if !removes_escape_codes(ps) {
             return true;
         }

@@ -2,11 +2,12 @@
 //! environment and the host by the same rules as PSWriteColorEX. Write-ColorEX detects once per
 //! session and keeps the result.
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::Ordering;
 
 use pwrs::prelude::*;
 
 use crate::host::{env_var, host_virtual_terminal, ps_version, this_cmdlet};
+use crate::session;
 
 /// A color mode, from none to 24-bit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -642,30 +643,23 @@ pub fn detect(ps: &Pipeline<'_>, silent: bool) -> PsResult<Detection> {
     Ok(d)
 }
 
-/// The color support and bold rendering Write-ColorEX uses, detected on first use and kept for
-/// the session: 0 before detection, else 1 + the support's place in SUPPORTS x 2 + 1 when fonts
-/// draw bold.
-static SESSION_SUPPORT: AtomicU8 = AtomicU8::new(0);
-
 /// The color modes in Support's order.
 const SUPPORTS: [Support; 4] = [Support::None, Support::Ansi4, Support::Ansi8, Support::TrueColor];
 
+/// The color support and bold rendering Write-ColorEX uses, detected on the first write after
+/// the module is imported in the runspace and kept in the runspace's state as 1 + the support's
+/// place in SUPPORTS x 2 + 1 when fonts draw bold.
 pub fn session_support(ps: &Pipeline<'_>) -> PsResult<(Support, bool)> {
-    let kept = SESSION_SUPPORT.load(Ordering::Acquire);
+    let _session = session::enter()?;
+    let kept = session::with_current(|session| session.support.load(Ordering::Acquire));
     if kept != 0 {
         let code = kept - 1;
         return Ok((SUPPORTS[usize::from(code >> 1)], code & 1 == 1));
     }
     let d = detect(ps, true)?;
     let found = (d.color_support, d.bold_fonts);
-    SESSION_SUPPORT.store(1 + (found.0 as u8) * 2 + u8::from(found.1), Ordering::Release);
+    session::with_current(|session| session.support.store(1 + (found.0 as u8) * 2 + u8::from(found.1), Ordering::Release));
     Ok(found)
-}
-
-/// Forgets the session's detection, so the next Write-ColorEX call detects again; the module
-/// does this on import.
-pub fn reset_session_support() {
-    SESSION_SUPPORT.store(0, Ordering::Release);
 }
 
 fn hashtable_of(pairs: &[(&str, PsObject)]) -> PsResult<PsHashtable> {
@@ -696,12 +690,13 @@ fn hashtable_of(pairs: &[(&str, PsObject)]) -> PsResult<PsHashtable> {
 #[derive(Default)]
 pub struct TestAnsiSupport {
     /// Suppresses all warning messages and terminal limitation notices.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub silent: bool,
 }
 
 impl Cmdlet for TestAnsiSupport {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         let d = detect(ps, self.silent)?;
         let styles = hashtable_of(&[
             ("Bold", d.styles.bold.into_ps()?),

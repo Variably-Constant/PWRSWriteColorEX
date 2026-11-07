@@ -9,6 +9,7 @@ use crate::colors;
 use crate::host::this_cmdlet;
 use crate::names::{like_any, register_name, upper_order};
 use crate::oklab;
+use crate::session;
 use crate::style::new_style;
 
 /// The PSColorStyle properties a profile file holds, in the order it holds them.
@@ -194,15 +195,16 @@ fn is_blank_value(value: &PsObject, blank: &PsObject) -> PsResult<bool> {
 #[derive(Default)]
 pub struct ExportColorProfile {
     /// The file to write.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub path: String,
     /// The names of the profiles to write. Wildcards are allowed. Every profile when left out.
-    #[param]
+    #[param(supports_wildcards, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "*")))]
     pub name: Option<Vec<String>>,
 }
 
 impl Cmdlet for ExportColorProfile {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         let patterns = self.name.clone().unwrap_or_else(|| vec!["*".to_string()]);
         let profiles = style_type().call_static("get_Profiles", &[])?;
         let keys = if profiles.is_null() { Vec::new() } else { Vec::<String>::from_ps(&profiles.get("Keys")?)? };
@@ -335,7 +337,7 @@ const THEMES: [(&str, &str); 13] = [
 #[derive(Default)]
 pub struct ImportColorProfile {
     /// The file to read.
-    #[param(mandatory, position = 0, set = "Path")]
+    #[param(mandatory, position = 0, set = "Path", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub path: String,
     /// The theme to read: CatppuccinFrappe, CatppuccinLatte, CatppuccinMacchiato, CatppuccinMocha,
     /// CSS, Dracula, GruvboxDark, GruvboxLight, Nord, OneDark, PowerShell, SolarizedDark,
@@ -346,11 +348,12 @@ pub struct ImportColorProfile {
         validate_set = [
             "CatppuccinFrappe", "CatppuccinLatte", "CatppuccinMacchiato", "CatppuccinMocha", "CSS", "Dracula", "GruvboxDark",
             "GruvboxLight", "Nord", "OneDark", "PowerShell", "SolarizedDark", "SolarizedLight", "TokyoNight"
-        ]
+        ],
+        attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = ""))
     )]
     pub theme: String,
     /// Writes each profile read to the pipeline.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub pass_thru: bool,
 }
 
@@ -366,6 +369,7 @@ fn parse_json(ps: &Pipeline<'_>, text: PsObject) -> PsResult<PsObject> {
 
 impl Cmdlet for ImportColorProfile {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         if self.theme.eq_ignore_ascii_case("PowerShell") {
             return import_powershell_theme(ps, self.pass_thru);
         }
@@ -760,7 +764,7 @@ fn import_powershell_theme(ps: &Pipeline<'_>, pass_thru: bool) -> PsResult<()> {
 #[derive(Default)]
 pub struct RemoveColorProfile {
     /// The names of the profiles to remove.
-    #[param(mandatory, position = 0, value_from_pipeline)]
+    #[param(mandatory, position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub name: Vec<String>,
 }
 

@@ -9,6 +9,7 @@ use crate::forms::color_form;
 use crate::gradient::{named_gradient, NAMED_GRADIENTS};
 use crate::oklab;
 use crate::runs::{markup_style, MARKUP_STYLES};
+use crate::session;
 use crate::write::{render, splat_refusal, ColorArg, WriteOptions};
 
 /// Whether a name matches a PowerShell wildcard pattern, without regard to case: * for any run
@@ -188,19 +189,20 @@ pub fn register_name(ps: &Pipeline<'_>, name: &str, color: &PsObject, force: boo
 #[derive(Default)]
 pub struct RegisterColorName {
     /// The name for the color.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub name: String,
     /// The color: a hex code ('#FF8000', '#F80'), 'rgb(255, 128, 0)', 'hsl(30, 100%, 50%)', an RGB
     /// array @(255, 128, 0), or a name already in the color table.
-    #[param(mandatory, position = 1)]
+    #[param(mandatory, position = 1, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub color: PsObject,
     /// Replaces a name that is in use.
-    #[param]
+    #[param(attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub force: bool,
 }
 
 impl Cmdlet for RegisterColorName {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         register_name(ps, &self.name, &self.color, self.force)?;
         Ok(())
     }
@@ -217,12 +219,13 @@ impl Cmdlet for RegisterColorName {
 #[derive(Default)]
 pub struct UnregisterColorName {
     /// The names to remove.
-    #[param(mandatory, position = 0, value_from_pipeline)]
+    #[param(mandatory, position = 0, value_from_pipeline, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub name: Vec<String>,
 }
 
 impl Cmdlet for UnregisterColorName {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         for name in &self.name {
             if !colors::unregister(name) {
                 ps.write_error(
@@ -264,19 +267,19 @@ impl Cmdlet for UnregisterColorName {
 pub struct ShowColorTable {
     /// The names to show, or with -Profiles the profiles. Wildcards are allowed. Every name when
     /// left out.
-    #[param(position = 0, set = ["Names", "Profiles"])]
+    #[param(position = 0, set = ["Names", "Profiles"], supports_wildcards, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "*")))]
     pub name: Option<Vec<String>>,
     /// Shows each sample as a background behind spaces rather than as blocks of text color.
-    #[param(set = "Names")]
+    #[param(set = "Names", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub background: bool,
     /// Writes the text styles instead of the color names.
-    #[param(mandatory, set = "Styles")]
+    #[param(mandatory, set = "Styles", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub styles: bool,
     /// Writes the 256-color chart instead of the color names.
-    #[param(mandatory, set = "Palette")]
+    #[param(mandatory, set = "Palette", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub palette: bool,
     /// Writes the style profiles instead of the color names.
-    #[param(mandatory, set = "Profiles")]
+    #[param(mandatory, set = "Profiles", attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = false)))]
     pub profiles: bool,
 }
 
@@ -561,6 +564,7 @@ fn show(ps: &Pipeline<'_>, text: &str, color: Option<ColorArg>, background: bool
 
 impl Cmdlet for ShowColorTable {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         let patterns = self.name.clone().unwrap_or_else(|| vec!["*".to_string()]);
         if self.styles {
             return show_styles(ps);
@@ -656,6 +660,7 @@ macro_rules! color_completers {
         $(
             #[completer(cmdlet = $cmdlet, parameter = $parameter)]
             pub fn $name(ctx: &CompletionContext) -> PsResult<Vec<Completion>> {
+                let _session = session::enter()?;
                 Ok(color_name_completions(&ctx.word))
             }
         )*
@@ -685,6 +690,7 @@ macro_rules! gradient_completers {
         $(
             #[completer(cmdlet = $cmdlet, parameter = $parameter)]
             pub fn $name(ctx: &CompletionContext) -> PsResult<Vec<Completion>> {
+                let _session = session::enter()?;
                 Ok(gradient_completions(&ctx.word))
             }
         )*
@@ -703,6 +709,7 @@ gradient_completers! {
 
 #[completer(cmdlet = "Unregister-ColorName", parameter = "Name")]
 pub fn UnregisterColorNameName(ctx: &CompletionContext) -> PsResult<Vec<Completion>> {
+    let _session = session::enter()?;
     Ok(registered_name_completions(&ctx.word))
 }
 

@@ -6,6 +6,7 @@ use pwrs::prelude::*;
 use crate::colors;
 use crate::names::register_rgb;
 use crate::oklab;
+use crate::session;
 use crate::write::ColorArg;
 
 /// A channel of an RGB array as PowerShell reads a missing one: 0.
@@ -33,7 +34,7 @@ fn int32(value: i64) -> i32 {
 #[derive(Default)]
 pub struct ConvertHexToRGB {
     /// The hex color code to convert.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub hex: String,
 }
 
@@ -61,7 +62,7 @@ impl Cmdlet for ConvertHexToRGB {
 #[allow(non_snake_case)]
 pub struct ConvertRGBToANSI8 {
     /// The red, green and blue values.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub RGB: Vec<i32>,
 }
 
@@ -83,7 +84,7 @@ impl Cmdlet for ConvertRGBToANSI8 {
 #[allow(non_snake_case)]
 pub struct ConvertRGBToANSI4 {
     /// The red, green and blue values.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub RGB: Vec<i32>,
 }
 
@@ -107,6 +108,7 @@ pub struct GetColorTableWithRGB {}
 
 impl Cmdlet for GetColorTableWithRGB {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         let table = crate::host::new_table()?;
         for (name, color) in colors::table() {
             let rgb: Vec<PsObject> = color.rgb.iter().map(|&v| i32::from(v).into_ps()).collect::<PsResult<_>>()?;
@@ -136,10 +138,10 @@ impl Cmdlet for GetColorTableWithRGB {
 #[allow(non_snake_case)]
 pub struct GetLighterRGBColor {
     /// The red, green and blue values.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub RGB: Vec<i32>,
     /// How much lighter: each channel is multiplied by it. 1.4 when left out.
-    #[param(position = 1)]
+    #[param(position = 1, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 1.4)))]
     pub factor: Option<f64>,
 }
 
@@ -164,12 +166,13 @@ impl Cmdlet for GetLighterRGBColor {
 #[derive(Default)]
 pub struct GetLighterColorName {
     /// The color name to lighten.
-    #[param(mandatory, position = 0)]
+    #[param(mandatory, position = 0, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub color_name: String,
 }
 
 impl Cmdlet for GetLighterColorName {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         ps.write(colors::lighter_name(&self.color_name))
     }
 }
@@ -187,10 +190,10 @@ impl Cmdlet for GetLighterColorName {
 #[allow(non_snake_case)]
 pub struct GetLighterANSI8Color {
     /// The ANSI 256-color code to lighten, 0-255.
-    #[param(mandatory, position = 0, validate_range(0, 255))]
+    #[param(mandatory, position = 0, validate_range(0, 255), attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 0)))]
     pub ANSI8Code: i32,
     /// How much lighter. 1.4 when left out.
-    #[param(position = 1)]
+    #[param(position = 1, attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = 1.4)))]
     pub factor: Option<f64>,
 }
 
@@ -226,15 +229,16 @@ fn shown_color(color: &PsObject) -> PsResult<String> {
 pub struct GetColorContrast {
     /// The text color: a hex code ('#FF8000', '#F80'), 'rgb(255, 128, 0)', 'hsl(30, 100%, 50%)', an
     /// RGB array @(255, 128, 0), or a name in the color table.
-    #[param(mandatory, position = 0, alias = ["C", "ForegroundColor", "FGC"])]
+    #[param(mandatory, position = 0, alias = ["C", "ForegroundColor", "FGC"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub color: PsObject,
     /// The background color, in the same forms as -Color.
-    #[param(mandatory, position = 1, alias = ["B", "BGC"])]
+    #[param(mandatory, position = 1, alias = ["B", "BGC"], attribute(type = "System.Management.Automation.PSDefaultValueAttribute", named(Value = "")))]
     pub back_ground_color: PsObject,
 }
 
 impl Cmdlet for GetColorContrast {
     fn process(&mut self, ps: &Pipeline<'_>) -> PsResult<()> {
+        let _session = session::enter()?;
         let mut warnings = Vec::new();
         let foreground = register_rgb(&self.color, &mut |message| warnings.push(message))?;
         let background = register_rgb(&self.back_ground_color, &mut |message| warnings.push(message))?;

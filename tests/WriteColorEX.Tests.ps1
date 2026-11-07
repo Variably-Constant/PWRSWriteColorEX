@@ -281,3 +281,19 @@ Describe 'Write-ColorEX style profiles' -Tag 'Output' {
         }
     }
 }
+
+Describe 'Write-ColorEX -Debugging' -Tag 'Output' {
+    BeforeAll {
+        # A host of the kind running this suite, started so it cannot ask anything: a question the
+        # engine puts to it fails the command, which stops the script, rather than waiting for an
+        # answer. It imports the module PWRS_MODULE names, which it inherits.
+        $script:shell = (Get-Process -Id $PID).Path
+    }
+
+    It 'writes every message under -Debug without asking whether to continue' {
+        $command = '$ErrorActionPreference = ''Stop''; Import-Module (Join-Path $env:PWRS_MODULE ''PWRSWriteColorEX.psd1''); Write-ColorEX -Text ''x'' -Debugging -Debug 6>$null; ''done'''
+        $output = @(& $script:shell -NoProfile -NonInteractive -Command $command 2>&1 | ForEach-Object { "$_" })
+        $output | Should -Contain 'done'
+        @($output | Where-Object { $_ -match '\[DEBUG\] Write-ColorEX completed' }).Count | Should -Be 1
+    }
+}

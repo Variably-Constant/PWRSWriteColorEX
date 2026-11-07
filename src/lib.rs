@@ -32,6 +32,7 @@ pub mod names;
 pub mod oklab;
 mod profiles;
 pub mod runs;
+mod session;
 mod set_once;
 pub mod spaces;
 #[allow(rustdoc::broken_intra_doc_links)]
@@ -72,14 +73,22 @@ use width::MeasureDisplayWidth;
 #[cfg(feature = "module")]
 use write::WriteColorEX;
 
-/// Detects the terminal's color support again on the first write after each import, and forgets
-/// the registered color names, as importing PSWriteColorEX does. The built-in profiles and
-/// [PSColorStyle] are set up by the C# import hook in src/csharp/ModuleHooks.cs.
+/// Starts the importing runspace's own state afresh, as importing PSWriteColorEX gives the
+/// runspace script variables of its own: no registered color names, and the color support
+/// detected again on its first write. The built-in profiles and [PSColorStyle] are set up by the
+/// C# import hook in src/csharp/ModuleHooks.cs.
 #[cfg(feature = "module")]
 #[on_import]
 fn initialize() -> PsResult<()> {
-    detect::reset_session_support();
-    colors::clear_registered();
+    session::begin_import()
+}
+
+/// Drops the state of the runspace whose import was removed, by Remove-Module or by the runspace
+/// closing.
+#[cfg(feature = "module")]
+#[on_remove]
+fn removed(removal: &pwrs::Removal) -> PsResult<()> {
+    session::end_import(removal.runspace);
     Ok(())
 }
 
@@ -145,4 +154,5 @@ pwrs::export_module! {
         RemoveColorProfileName,
     ],
     on_import: initialize,
+    on_remove: removed,
 }

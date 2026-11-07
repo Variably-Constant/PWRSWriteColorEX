@@ -5,8 +5,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use subetha_core::swap_cell::SwapCell;
-
+use crate::session;
 use crate::set_once::SetOnce;
 
 /// One named color in every color mode.
@@ -192,43 +191,41 @@ fn index() -> &'static HashMap<String, usize> {
     })
 }
 
-/// The names Register-ColorName added, in the order they were first added, each with its
-/// spelling from then. They last until the module is imported again. Any thread reads them
-/// without waiting; a change swaps in a new table, and a replaced one is freed when its last
-/// reader lets go.
-static REGISTERED: SetOnce<SwapCell<Vec<(String, Entry)>>> = SetOnce::new();
-
-fn registered_names() -> &'static SwapCell<Vec<(String, Entry)>> {
-    REGISTERED.get_or_init(|| SwapCell::new(Vec::new()))
-}
+// The names Register-ColorName added are the runspace's own, in session::Session, and last until
+// the module is imported in that runspace again. Any thread reads them without waiting; a change
+// swaps in a new table, and a replaced one is freed when its last reader lets go.
 
 /// Adds a name, or replaces the color of a name already registered, which keeps its spelling and
 /// place.
 pub fn register(name: &str, entry: Entry) {
-    registered_names().rcu(|current| {
-        let mut next = current.clone();
-        match next.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
-            Some(found) => found.1 = entry,
-            None => next.push((name.to_string(), entry)),
-        }
-        next
+    session::with_current(|session| {
+        session.names.rcu(|current| {
+            let mut next = current.clone();
+            match next.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
+                Some(found) => found.1 = entry,
+                None => next.push((name.to_string(), entry)),
+            }
+            next
+        });
     });
 }
 
 /// Removes a registered name; false when it was not registered.
 pub fn unregister(name: &str) -> bool {
-    let replaced = registered_names().rcu(|current| current.iter().filter(|(n, _)| !n.eq_ignore_ascii_case(name)).cloned().collect());
-    replaced.iter().any(|(n, _)| n.eq_ignore_ascii_case(name))
+    session::with_current(|session| {
+        let replaced = session.names.rcu(|current| current.iter().filter(|(n, _)| !n.eq_ignore_ascii_case(name)).cloned().collect());
+        replaced.iter().any(|(n, _)| n.eq_ignore_ascii_case(name))
+    })
 }
 
 /// The registered names and their colors, in the order they were added.
 pub fn registered() -> Vec<(String, Entry)> {
-    registered_names().load().to_vec()
+    session::with_current(|session| session.names.load().to_vec())
 }
 
 /// Forgets every registered name, as importing the module again does.
 pub fn clear_registered() {
-    registered_names().store(Arc::new(Vec::new()));
+    session::with_current(|session| session.names.store(Arc::new(Vec::new())));
 }
 
 /// Every name in the table with its color: the built-in names, a registered name over a built-in
@@ -248,8 +245,9 @@ pub fn table() -> Vec<(String, Entry)> {
 /// The table entry for a color name, registered or built-in, compared without regard to case as
 /// a PowerShell hashtable compares its keys.
 pub fn lookup(name: &str) -> Option<Entry> {
-    if let Some((_, entry)) = registered_names().load().iter().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
-        return Some(*entry);
+    let registered = session::with_current(|session| session.names.load().iter().find(|(n, _)| n.eq_ignore_ascii_case(name)).map(|(_, entry)| *entry));
+    if registered.is_some() {
+        return registered;
     }
     index().get(&name.to_ascii_lowercase()).map(|&i| COLORS[i].entry())
 }
